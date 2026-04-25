@@ -35,6 +35,9 @@
  *  16: normalized body distance straight
  *  17: normalized body distance left
  *  18: normalized body distance right
+ *  19: reachable space straight
+ *  20: reachable space left
+ *  21: reachable space right
  *
  * The network outputs 3 scores:
  *   0: turn left
@@ -43,7 +46,7 @@
  *
  * The highest-scoring output becomes the chosen action.
  */
-#define BRAIN_INPUTS 19
+#define BRAIN_INPUTS 22
 #define BRAIN_HIDDEN 32
 #define BRAIN_OUTPUTS 3
 

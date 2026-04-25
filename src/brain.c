@@ -125,6 +125,55 @@ static float normalized_body_distance(const Game* game, Vec2 head, Direction dir
   }
 }
 
+static bool position_is_blocked_for_flood_fill(const Game* game, Vec2 position) {
+  if (position.x < 0 || position.x >= GRID_WIDTH || position.y < 0 || position.y >= GRID_HEIGHT) {
+    return true;
+  }
+  for (int i = 1; i < game->snake.length; i++) {
+    if (game->snake.body[i].x == position.x && game->snake.body[i].y == position.y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static float normalized_reachable_space(const Game* game, Vec2 start) {
+  if (position_is_blocked_for_flood_fill(game, start)) {
+    return 0.0f;
+  }
+
+  bool visited[GRID_HEIGHT][GRID_WIDTH] = {false};
+  Vec2 queue[MAX_SNAKE_LENGTH];
+  int head = 0;
+  int tail = 0;
+  int reachable = 0;
+  queue[tail++] = start;
+  visited[start.y][start.x] = true;
+  while (head < tail) {
+    Vec2 current = queue[head++];
+    reachable++;
+    Vec2 neighbors[4] = {
+        {current.x, current.y - 1},
+        {current.x, current.y + 1},
+        {current.x - 1, current.y},
+        {current.x + 1, current.y},
+    };
+
+    for (int i = 0; i < 4; i++) {
+      Vec2 next = neighbors[i];
+      if (next.x < 0 || next.x >= GRID_WIDTH || next.y < 0 || next.y >= GRID_HEIGHT) {
+        continue;
+      }
+      if (visited[next.y][next.x] || position_is_blocked_for_flood_fill(game, next)) {
+        continue;
+      }
+      visited[next.y][next.x] = true;
+      queue[tail++] = next;
+    }
+  }
+  return (float)reachable / (float)MAX_SNAKE_LENGTH;
+}
+
 /*
  * Converts the current Game state into the input values used by the brain.
  *
@@ -158,6 +207,18 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   inputs[16] = normalized_body_distance(game, head, current);
   inputs[17] = normalized_body_distance(game, head, left);
   inputs[18] = normalized_body_distance(game, head, right);
+
+  Vec2 straight_delta = direction_delta(current);
+  Vec2 left_delta = direction_delta(left);
+  Vec2 right_delta = direction_delta(right);
+
+  Vec2 straight_head = {head.x + straight_delta.x, head.y + straight_delta.y};
+  Vec2 left_head = {head.x + left_delta.x, head.y + left_delta.y};
+  Vec2 right_head = {head.x + right_delta.x, head.y + right_delta.y};
+
+  inputs[19] = normalized_reachable_space(game, straight_head);
+  inputs[20] = normalized_reachable_space(game, left_head);
+  inputs[21] = normalized_reachable_space(game, right_head);
 }
 
 /*

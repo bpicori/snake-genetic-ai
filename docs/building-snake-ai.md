@@ -523,7 +523,7 @@ food_dy = (food.y - head.y) / GRID_HEIGHT
 - brain inputs include normalized wall and body distances for straight, left,
   and right movement
 - command-line flags select training, replay, no-render training, generation
-  count, brain file, CSV log file, and genetic strategy
+  count, brain file, CSV log file, genetic strategy, and random seed
 - logs include strategy name, best fitness, average fitness, score, steps,
   distance reward, and mutation settings
 
@@ -541,6 +541,7 @@ Useful commands:
 ./out/snake-ai --no-render --generations 1000 --strategy adaptive
 ./out/snake-ai --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain --csv out/adaptive-conservative.csv
 ./out/snake-ai --no-render --generations 1000 --strategy v3 --brain out/v3.brain --csv out/v3.csv
+./out/snake-ai --no-render --generations 1000 --strategy adaptive --seed 12345 --brain out/adaptive-seed-12345.brain --csv out/adaptive-seed-12345.csv
 ```
 
 Good next experiments:

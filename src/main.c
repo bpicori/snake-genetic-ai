@@ -1,8 +1,11 @@
 #include <SDL.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "SDL_keycode.h"
 #include "SDL_render.h"
@@ -34,12 +37,14 @@ typedef struct {
   const char* brain_path;
   const char* csv_path;
   PopulationStrategy strategy;
+  bool seed_provided;
+  unsigned int seed;
 } AppConfig;
 
 static void print_usage(const char* program_name) {
   printf(
       "Usage: %s [--train|--replay] [--no-render] [--generations count] "
-      "[--brain path] [--csv path] [--strategy v1|v2|v3|v4|adaptive|adaptive-conservative]\n",
+      "[--brain path] [--csv path] [--strategy v1|v2|v3|v4|adaptive|adaptive-conservative] [--seed value]\n",
       program_name);
   printf("  --train              train and periodically replay the best brain (default)\n");
   printf("  --replay             load the saved brain and replay without training\n");
@@ -48,6 +53,7 @@ static void print_usage(const char* program_name) {
   printf("  --brain <path>       brain file to load/save (default: out/best.brain)\n");
   printf("  --csv <path>         write training metrics to a CSV file\n");
   printf("  --strategy <name>    choose v1, v2, v3, v4, adaptive, or adaptive-conservative\n");
+  printf("  --seed <value>       use a fixed random seed for reproducible runs\n");
 }
 
 static bool parse_args(int argc, char* argv[], AppConfig* config) {
@@ -57,6 +63,8 @@ static bool parse_args(int argc, char* argv[], AppConfig* config) {
   config->brain_path = DEFAULT_BRAIN_PATH;
   config->csv_path = NULL;
   config->strategy = POPULATION_STRATEGY_ADAPTIVE_MUTATION;
+  config->seed_provided = false;
+  config->seed = 0;
 
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--train") == 0) {
@@ -104,6 +112,25 @@ static bool parse_args(int argc, char* argv[], AppConfig* config) {
         return false;
       }
       i++;
+    } else if (strcmp(argv[i], "--seed") == 0) {
+      if (i + 1 >= argc) {
+        fprintf(stderr, "Missing seed value.\n");
+        print_usage(argv[0]);
+        return false;
+      }
+
+      char* end = NULL;
+      errno = 0;
+      unsigned long seed = strtoul(argv[i + 1], &end, 10);
+      if (errno != 0 || end == argv[i + 1] || *end != '\0' || seed > UINT_MAX) {
+        fprintf(stderr, "Seed must be an unsigned integer.\n");
+        print_usage(argv[0]);
+        return false;
+      }
+
+      config->seed_provided = true;
+      config->seed = (unsigned int)seed;
+      i++;
     } else if (strcmp(argv[i], "--help") == 0) {
       print_usage(argv[0]);
       return false;
@@ -115,6 +142,12 @@ static bool parse_args(int argc, char* argv[], AppConfig* config) {
   }
 
   return true;
+}
+
+static void seed_random(const AppConfig* config) {
+  unsigned int seed = config->seed_provided ? config->seed : (unsigned int)time(NULL);
+  srand(seed);
+  printf("Random seed: %u%s\n", seed, config->seed_provided ? " (fixed)" : "");
 }
 
 static bool init_sdl(SDL_Window** window, SDL_Renderer** renderer) {
@@ -331,6 +364,8 @@ int main(int argc, char* argv[]) {
   if (!parse_args(argc, argv, &config)) {
     return 1;
   }
+
+  seed_random(&config);
 
   printf(
       "Mode: %s | strategy: %s | generations: %d | brain: %s\n", config.replay_only ? "replay" : "train",
