@@ -107,9 +107,11 @@ static Agent *train_generations(Population *population, int count) {
 
     best_agent = &population->agents[population->best_agent_index];
 
-    printf("Generation %d | fitness %.2f | score %d | steps %d | distance %d\n",
+    printf("Generation %d | fitness %.2f | score %d | steps %d | distance %d | "
+           "mutation %.3f %.3f\n",
            population->generation, best_agent->fitness, best_agent->score,
-           best_agent->steps, best_agent->distance_reward);
+           best_agent->steps, best_agent->distance_reward,
+           population->mutation_rate, population->mutation_strength);
 
     if (best_agent->fitness > best_fitness_ever) {
       best_fitness_ever = best_agent->fitness;
