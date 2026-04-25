@@ -1,11 +1,13 @@
 #include "SDL_keycode.h"
 #include "SDL_render.h"
 #include "SDL_video.h"
-#include "agent.h"
-#include "game.h"
 #include <SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+
+#include "agent.h"
+#include "game.h"
+#include "genetic.h"
 
 #define CELL_SIZE 30
 
@@ -18,7 +20,8 @@
 #define RENDER_FPS 60
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
-#define SNAKE_MOVES_PER_SECOND 15
+#define SNAKE_MOVES_PER_SECOND 30
+#define GENERATIONS_PER_REPLAY 500
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
 
 bool ai_enabled = true;
@@ -80,6 +83,27 @@ static void handle_input(bool *running, Game *game) {
   }
 }
 
+static Agent *train_generations(Population *population, int count) {
+  Agent *best_agent = NULL;
+
+  for (int i = 0; i < count; i++) {
+    population_evaluate(population);
+
+    best_agent = &population->agents[population->best_agent_index];
+
+    printf("Generation %d | best fitness %.2f | score %d | steps %d\n",
+           population->generation, best_agent->fitness, best_agent->score,
+           best_agent->steps);
+
+    population_next_generation(population);
+  }
+
+  population_evaluate(population);
+  best_agent = &population->agents[population->best_agent_index];
+
+  return best_agent;
+}
+
 int main(void) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
@@ -113,8 +137,10 @@ int main(void) {
   Game game;
   game_init(&game);
 
-  Agent agent;
-  agent_randomize(&agent);
+  Population population;
+  population_init(&population);
+
+  Agent *best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
 
   Uint32 last_update = SDL_GetTicks();
   const Uint32 update_delay = SNAKE_UPDATE_DELAY_MS;
@@ -126,14 +152,19 @@ int main(void) {
 
     if (now - last_update >= update_delay) {
       if (ai_enabled) {
-        Direction direction = agent_choose_direction(&agent, &game);
+        Direction direction = agent_choose_direction(best_agent, &game);
         game_set_direction(&game, direction);
       }
 
       game_update(&game);
-      if (!game.alive) {
-        agent_set_result(&agent, &game);
+
+      if (!game.alive || game.steps >= MAX_GAME_STEPS ||
+          game.steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
+        population_next_generation(&population);
+        best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
+        game_init(&game);
       }
+
       last_update = now;
     }
 

@@ -1,7 +1,6 @@
 #include "brain.h"
-#include <stdlib.h>
 #include <math.h>
-
+#include <stdlib.h>
 
 static float random_weight(void) {
   return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
@@ -67,6 +66,21 @@ static void build_inputs(const Game *game, float inputs[BRAIN_INPUTS]) {
   inputs[10] = game->food.x > head.x ? 1.0f : 0.0f;
 }
 
+static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
+
+static float random_mutation(float mutation_strength) {
+  return (random_float() * 2.0f - 1.0f) * mutation_strength;
+}
+
+static float mutate_value(float value, float mutation_rate,
+                          float mutation_strength) {
+  if (random_float() < mutation_rate) {
+    value += random_mutation(mutation_strength);
+  }
+
+  return value;
+}
+
 void brain_randomize(Brain *brain) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
@@ -125,4 +139,50 @@ Direction brain_choose_direction(const Brain *brain, const Game *game) {
   }
 
   return direction_from_action(game->snake.direction, best_action);
+}
+
+void brain_copy(Brain *dest, const Brain *src) {
+  for (int i = 0; i < BRAIN_INPUTS; i++) {
+    for (int j = 0; j < BRAIN_HIDDEN; j++) {
+      dest->w1[i][j] = src->w1[i][j];
+    }
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    dest->b1[i] = src->b1[i];
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
+      dest->w2[i][j] = src->w2[i][j];
+    }
+  }
+
+  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
+    dest->b2[i] = src->b2[i];
+  }
+}
+
+void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
+  for (int i = 0; i < BRAIN_INPUTS; i++) {
+    for (int j = 0; j < BRAIN_HIDDEN; j++) {
+      brain->w1[i][j] =
+          mutate_value(brain->w1[i][j], mutation_rate, mutation_strength);
+    }
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    brain->b1[i] = mutate_value(brain->b1[i], mutation_rate, mutation_strength);
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
+      brain->w2[i][j] =
+          mutate_value(brain->w2[i][j], mutation_rate, mutation_strength);
+    }
+  }
+
+  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
+    brain->b2[i] = mutate_value(brain->b2[i], mutation_rate, mutation_strength);
+  }
 }

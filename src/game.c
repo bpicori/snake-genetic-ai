@@ -59,6 +59,7 @@ void game_init(Game *game) {
   game->snake.length = 1;
   game->snake.body[0] = (Vec2){5, 5};
   game->snake.direction = RIGHT;
+  game->steps_since_food = 0;
 
   spawn_food(game);
 
@@ -121,6 +122,7 @@ void game_update(Game *game) {
 
   snake->body[0] = new_head;
   game->steps++;
+  game->steps_since_food++;
 
   if (will_eat_food) {
     game->score++;
@@ -128,7 +130,7 @@ void game_update(Game *game) {
       snake->body[snake->length] = old_tail;
       snake->length++;
     }
-
+    game->steps_since_food = 0;
     spawn_food(game);
   }
 }

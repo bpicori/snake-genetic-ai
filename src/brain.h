@@ -48,5 +48,7 @@ typedef struct {
 
 void brain_randomize(Brain *brain);
 Direction brain_choose_direction(const Brain *brain, const Game *game);
+void brain_copy(Brain *dest, const Brain *src);
+void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength);
 
 #endif
