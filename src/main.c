@@ -10,9 +10,6 @@
 #include "genetic.h"
 #include "render.h"
 
-#define GRID_WIDTH 20
-#define GRID_HEIGHT 20
-
 #define WINDOW_WIDTH (GRID_WIDTH * CELL_SIZE)
 #define WINDOW_HEIGHT (GRID_HEIGHT * CELL_SIZE)
 
@@ -25,7 +22,7 @@
 
 #define BEST_BRAIN_PATH "out/best.brain"
 
-#define REPLAY_ONLY false
+#define REPLAY_ONLY true
 
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
@@ -65,6 +62,7 @@ static void cleanup_sdl(SDL_Window *window, SDL_Renderer *renderer) {
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
+
 static void handle_input(bool *running, Game *game) {
   SDL_Event event;
 
@@ -156,6 +154,35 @@ static bool setup_best_agent(Population *population, Agent *saved_agent,
   return true;
 }
 
+static void update_simulation(Game *game, Agent **best_agent,
+                              Population *population) {
+  if (ai_enabled) {
+    Direction direction = agent_choose_direction(*best_agent, game);
+    game_set_direction(game, direction);
+  }
+
+  game_update(game);
+
+  if (!game->alive || game->steps >= MAX_GAME_STEPS ||
+      game->steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
+    if (REPLAY_ONLY) {
+      game_init(game);
+    } else {
+      population_next_generation(population);
+      *best_agent = train_generations(population, GENERATIONS_PER_REPLAY);
+      game_init(game);
+    }
+  }
+}
+
+static void update_window_title(SDL_Window *window, const Game *game) {
+  char title[128];
+
+  snprintf(title, sizeof(title), "Snake AI | Score: %d", game->score);
+
+  SDL_SetWindowTitle(window, title);
+}
+
 int main(void) {
   SDL_Window *window = NULL;
   SDL_Renderer *renderer = NULL;
@@ -187,24 +214,8 @@ int main(void) {
     Uint32 now = SDL_GetTicks();
 
     if (now - last_update >= update_delay) {
-      if (ai_enabled) {
-        Direction direction = agent_choose_direction(best_agent, &game);
-        game_set_direction(&game, direction);
-      }
-
-      game_update(&game);
-
-      if (!game.alive || game.steps >= MAX_GAME_STEPS ||
-          game.steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
-        if (REPLAY_ONLY) {
-          game_init(&game);
-        } else {
-          population_next_generation(&population);
-          best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
-          game_init(&game);
-        }
-      }
-
+      update_simulation(&game, &best_agent, &population);
+      update_window_title(window, &game);
       last_update = now;
     }
 
