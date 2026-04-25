@@ -64,11 +64,72 @@ static Direction direction_from_action(Direction current, int action) {
   return current;
 }
 
+static Vec2 direction_delta(Direction direction) {
+  switch (direction) {
+    case UP:
+      return (Vec2){0, -1};
+    case DOWN:
+      return (Vec2){0, 1};
+    case LEFT:
+      return (Vec2){-1, 0};
+    case RIGHT:
+      return (Vec2){1, 0};
+  }
+
+  return (Vec2){0, 0};
+}
+
+static float max_distance_for_direction(Direction direction) {
+  return direction == LEFT || direction == RIGHT ? (float)GRID_WIDTH : (float)GRID_HEIGHT;
+}
+
+static float normalized_wall_distance(Vec2 head, Direction direction) {
+  Vec2 delta = direction_delta(direction);
+  int distance = 0;
+  Vec2 position = head;
+
+  while (true) {
+    position.x += delta.x;
+    position.y += delta.y;
+
+    if (position.x < 0 || position.x >= GRID_WIDTH || position.y < 0 || position.y >= GRID_HEIGHT) {
+      break;
+    }
+
+    distance++;
+  }
+
+  return (float)distance / max_distance_for_direction(direction);
+}
+
+static float normalized_body_distance(const Game* game, Vec2 head, Direction direction) {
+  Vec2 delta = direction_delta(direction);
+  int distance = 0;
+  Vec2 position = head;
+
+  while (true) {
+    position.x += delta.x;
+    position.y += delta.y;
+
+    if (position.x < 0 || position.x >= GRID_WIDTH || position.y < 0 || position.y >= GRID_HEIGHT) {
+      return 1.0f;
+    }
+
+    distance++;
+
+    for (int i = 1; i < game->snake.length; i++) {
+      if (game->snake.body[i].x == position.x && game->snake.body[i].y == position.y) {
+        return (float)distance / max_distance_for_direction(direction);
+      }
+    }
+  }
+}
+
 /*
- * Converts the current Game state into the 11 input values used by the brain.
+ * Converts the current Game state into the input values used by the brain.
  *
- * The inputs describe nearby danger, current movement direction, and where the
- * food is relative to the snake head.
+ * The inputs describe nearby danger, current movement direction, food position,
+ * and how much free space exists around the snake head.
  */
 static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   Direction current = game->snake.direction;
@@ -91,6 +152,12 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   inputs[10] = game->food.x > head.x ? 1.0f : 0.0f;
   inputs[11] = (float)(game->food.x - head.x) / GRID_WIDTH;
   inputs[12] = (float)(game->food.y - head.y) / GRID_HEIGHT;
+  inputs[13] = normalized_wall_distance(head, current);
+  inputs[14] = normalized_wall_distance(head, left);
+  inputs[15] = normalized_wall_distance(head, right);
+  inputs[16] = normalized_body_distance(game, head, current);
+  inputs[17] = normalized_body_distance(game, head, left);
+  inputs[18] = normalized_body_distance(game, head, right);
 }
 
 /*

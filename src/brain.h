@@ -6,9 +6,9 @@
 /*
  * Neural network input layout.
  *
- * The brain receives a compact snapshot of the current game state as 13 float
- * values. Most values are booleans represented as 0.0f or 1.0f; the final two
- * values are normalized food distances.
+ * The brain receives a compact snapshot of the current game state as 19 float
+ * values. Some values are booleans represented as 0.0f or 1.0f; the rest are
+ * normalized distances.
  *
  * Inputs 0-2 describe immediate danger relative to the snake's current
  * direction:
@@ -29,6 +29,12 @@
  *  10: food is right
  *  11: normalized food dx
  *  12: normalized food dy
+ *  13: normalized wall distance straight
+ *  14: normalized wall distance left
+ *  15: normalized wall distance right
+ *  16: normalized body distance straight
+ *  17: normalized body distance left
+ *  18: normalized body distance right
  *
  * The network outputs 3 scores:
  *   0: turn left
@@ -37,7 +43,7 @@
  *
  * The highest-scoring output becomes the chosen action.
  */
-#define BRAIN_INPUTS 13
+#define BRAIN_INPUTS 19
 #define BRAIN_HIDDEN 32
 #define BRAIN_OUTPUTS 3
 

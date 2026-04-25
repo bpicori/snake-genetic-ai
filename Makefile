@@ -13,5 +13,7 @@ all:
 run: all
 	./$(OUT)
 
+build: all
+
 clean:
 	rm -f $(OUT)

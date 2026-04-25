@@ -20,6 +20,9 @@
 #define MIN_MUTATION_STRENGTH 0.05f
 #define MAX_MUTATION_STRENGTH 0.50f
 
+#define CONSERVATIVE_MAX_MUTATION_RATE 0.10f
+#define CONSERVATIVE_MAX_MUTATION_STRENGTH 0.30f
+
 // if fitness does not improve for 20 generations, increase mutation
 // if fitness improves, reduce mutation
 #define STAGNATION_THRESHOLD 20
@@ -29,7 +32,8 @@ typedef enum {
   POPULATION_STRATEGY_ELITE_PARENT_POOL,
   POPULATION_STRATEGY_CROSSOVER,
   POPULATION_STRATEGY_TOURNAMENT,
-  POPULATION_STRATEGY_ADAPTIVE_MUTATION
+  POPULATION_STRATEGY_ADAPTIVE_MUTATION,
+  POPULATION_STRATEGY_ADAPTIVE_CONSERVATIVE
 } PopulationStrategy;
 
 typedef struct {
@@ -56,5 +60,6 @@ void population_next_generation_v2_elite_parent_pool(Population* population);
 void population_next_generation_v3_crossover(Population* population);
 void population_next_generation_v4_tournament_selection(Population* population);
 void population_next_generation_v5_adaptive_mutation(Population* population);
+void population_next_generation_v6_adaptive_conservative(Population* population);
 
 #endif

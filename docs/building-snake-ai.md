@@ -520,7 +520,10 @@ food_dy = (food.y - head.y) / GRID_HEIGHT
 - hidden neurons were increased from 16 to 32
 - `MAX_GAME_STEPS` and `MAX_STEPS_WITHOUT_FOOD` were increased
 - fitness now uses squared score reward: `score * score * 1000`
-- command-line flags select training, replay, and genetic strategy
+- brain inputs include normalized wall and body distances for straight, left,
+  and right movement
+- command-line flags select training, replay, no-render training, generation
+  count, brain file, CSV log file, and genetic strategy
 - logs include strategy name, best fitness, average fitness, score, steps,
   distance reward, and mutation settings
 
@@ -534,11 +537,15 @@ Useful commands:
 ./out/snake-ai --train --strategy v3
 ./out/snake-ai --train --strategy v4
 ./out/snake-ai --train --strategy adaptive
+./out/snake-ai --train --strategy adaptive-conservative
+./out/snake-ai --no-render --generations 1000 --strategy adaptive
+./out/snake-ai --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain --csv out/adaptive-conservative.csv
+./out/snake-ai --no-render --generations 1000 --strategy v3 --brain out/v3.brain --csv out/v3.csv
 ```
 
 Good next experiments:
 
-- compare V1, V2, V3, V4, and adaptive mutation over the same number of
-  generations
+- compare V1, V2, V3, V4, adaptive mutation, and conservative adaptive mutation
+  over the same number of generations
 - try parallel population evaluation after the strategy comparison is stable
-- save comparison logs to a CSV file for easier analysis
+- plot CSV logs to compare strategies visually

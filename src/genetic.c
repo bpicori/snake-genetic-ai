@@ -80,21 +80,19 @@ static int tournament_parent_index(const Agent agents[], int tournament_size) {
  * clamp_float keeps mutation inside safe min/max limits, so it never becomes
  * too small to explore or too large to preserve useful behavior.
  */
-static void update_adaptive_mutation(Population* population) {
+static void update_adaptive_mutation(Population* population, float max_rate, float max_strength, float stagnation_multiplier) {
   // found a new best fitness
   if (population->best_fitness > population->best_fitness_ever) {
     population->best_fitness_ever = population->best_fitness;
     population->stagnant_generations = 0;
     // reduce mutation rate and strength by 5% (0.95 means reduce by 5%)
-    population->mutation_rate = clamp_float(population->mutation_rate * 0.95f, MIN_MUTATION_RATE, MAX_MUTATION_RATE);
-    population->mutation_strength = clamp_float(population->mutation_strength * 0.95f, MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
+    population->mutation_rate = clamp_float(population->mutation_rate * 0.95f, MIN_MUTATION_RATE, max_rate);
+    population->mutation_strength = clamp_float(population->mutation_strength * 0.95f, MIN_MUTATION_STRENGTH, max_strength);
   } else {
     population->stagnant_generations++;
-    // if no improvement for STAGNATION_THRESHOLD generations, increase mutation
-    // rate and strength by 25% (1.25 means increase by 25%)
     if (population->stagnant_generations >= STAGNATION_THRESHOLD) {
-      population->mutation_rate = clamp_float(population->mutation_rate * 1.25f, MIN_MUTATION_RATE, MAX_MUTATION_RATE);
-      population->mutation_strength = clamp_float(population->mutation_strength * 1.25f, MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
+      population->mutation_rate = clamp_float(population->mutation_rate * stagnation_multiplier, MIN_MUTATION_RATE, max_rate);
+      population->mutation_strength = clamp_float(population->mutation_strength * stagnation_multiplier, MIN_MUTATION_STRENGTH, max_strength);
       population->stagnant_generations = 0;
     }
   }
@@ -338,7 +336,41 @@ void population_next_generation_v4_tournament_selection(Population* population) 
 }
 
 void population_next_generation_v5_adaptive_mutation(Population* population) {
-  update_adaptive_mutation(population);
+  update_adaptive_mutation(population, MAX_MUTATION_RATE, MAX_MUTATION_STRENGTH, 1.25f);
+
+  sort_agents_by_fitness(population->agents, POPULATION_SIZE);
+
+  Agent next_agents[POPULATION_SIZE];
+
+  for (int i = 0; i < ELITE_COUNT; i++) {
+    next_agents[i] = population->agents[i];
+  }
+
+  for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
+    int parent_a_index = rand() % PARENT_POOL_SIZE;
+    int parent_b_index = rand() % PARENT_POOL_SIZE;
+
+    next_agents[i].fitness = 0.0f;
+    next_agents[i].score = 0;
+    next_agents[i].steps = 0;
+    next_agents[i].distance_reward = 0;
+
+    brain_crossover(&next_agents[i].brain, &population->agents[parent_a_index].brain, &population->agents[parent_b_index].brain);
+
+    brain_mutate(&next_agents[i].brain, population->mutation_rate, population->mutation_strength);
+  }
+
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    population->agents[i] = next_agents[i];
+  }
+
+  population->best_agent_index = 0;
+  population->best_fitness = population->agents[0].fitness;
+  population->generation++;
+}
+
+void population_next_generation_v6_adaptive_conservative(Population* population) {
+  update_adaptive_mutation(population, CONSERVATIVE_MAX_MUTATION_RATE, CONSERVATIVE_MAX_MUTATION_STRENGTH, 1.10f);
 
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
@@ -388,6 +420,9 @@ void population_next_generation(Population* population, PopulationStrategy strat
     case POPULATION_STRATEGY_ADAPTIVE_MUTATION:
       population_next_generation_v5_adaptive_mutation(population);
       break;
+    case POPULATION_STRATEGY_ADAPTIVE_CONSERVATIVE:
+      population_next_generation_v6_adaptive_conservative(population);
+      break;
   }
 }
 
@@ -403,6 +438,8 @@ const char* population_strategy_name(PopulationStrategy strategy) {
       return "v4";
     case POPULATION_STRATEGY_ADAPTIVE_MUTATION:
       return "adaptive";
+    case POPULATION_STRATEGY_ADAPTIVE_CONSERVATIVE:
+      return "adaptive-conservative";
   }
 
   return "adaptive";
@@ -431,6 +468,11 @@ bool population_strategy_from_name(const char* name, PopulationStrategy* strateg
 
   if (strcmp(name, "v5") == 0 || strcmp(name, "adaptive") == 0) {
     *strategy = POPULATION_STRATEGY_ADAPTIVE_MUTATION;
+    return true;
+  }
+
+  if (strcmp(name, "v6") == 0 || strcmp(name, "adaptive-conservative") == 0 || strcmp(name, "conservative") == 0) {
+    *strategy = POPULATION_STRATEGY_ADAPTIVE_CONSERVATIVE;
     return true;
   }
 
