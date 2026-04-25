@@ -10,8 +10,6 @@
 #include "genetic.h"
 #include "render.h"
 
-#define CELL_SIZE 30
-
 #define GRID_WIDTH 20
 #define GRID_HEIGHT 20
 
@@ -27,13 +25,46 @@
 
 #define BEST_BRAIN_PATH "out/best.brain"
 
-#define REPLAY_ONLY true
+#define REPLAY_ONLY false
 
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
 
+static bool init_sdl(SDL_Window **window, SDL_Renderer **renderer) {
+  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+    return false;
+  }
 
+  *window = SDL_CreateWindow("Snake AI", SDL_WINDOWPOS_CENTERED,
+                             SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
+                             WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 
+  if (*window == NULL) {
+    fprintf(stderr, "Window could not be created! SDL_Error: %s\n",
+            SDL_GetError());
+    SDL_Quit();
+    return false;
+  }
+
+  *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED);
+
+  if (*renderer == NULL) {
+    fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n",
+            SDL_GetError());
+    SDL_DestroyWindow(*window);
+    SDL_Quit();
+    return false;
+  }
+
+  return true;
+}
+
+static void cleanup_sdl(SDL_Window *window, SDL_Renderer *renderer) {
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
+}
 static void handle_input(bool *running, Game *game) {
   SDL_Event event;
 
@@ -100,31 +131,35 @@ static Agent *train_generations(Population *population, int count) {
   return best_agent;
 }
 
+static bool setup_best_agent(Population *population, Agent *saved_agent,
+                             Agent **best_agent) {
+  if (REPLAY_ONLY) {
+    if (!brain_load(&saved_agent->brain, BEST_BRAIN_PATH)) {
+      printf("No saved brain found at %s\n", BEST_BRAIN_PATH);
+      return false;
+    }
+
+    printf("Replay mode: loaded saved brain from %s\n", BEST_BRAIN_PATH);
+    *best_agent = saved_agent;
+    return true;
+  }
+
+  if (brain_load(&population->agents[0].brain, BEST_BRAIN_PATH)) {
+    population->agents[0].fitness = 0.0f;
+    population->agents[0].score = 0;
+    population->agents[0].steps = 0;
+
+    printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
+  }
+
+  *best_agent = train_generations(population, GENERATIONS_PER_REPLAY);
+  return true;
+}
+
 int main(void) {
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
-    return 1;
-  }
-
-  SDL_Window *window = SDL_CreateWindow("Snake AI", SDL_WINDOWPOS_CENTERED,
-                                        SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
-                                        WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
-
-  if (window == NULL) {
-    fprintf(stderr, "Window could not be created! SDL_Error: %s\n",
-            SDL_GetError());
-    SDL_Quit();
-    return 1;
-  }
-
-  SDL_Renderer *renderer =
-      SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
-  if (renderer == NULL) {
-    fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n",
-            SDL_GetError());
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+  SDL_Window *window = NULL;
+  SDL_Renderer *renderer = NULL;
+  if (!init_sdl(&window, &renderer)) {
     return 1;
   }
 
@@ -136,30 +171,11 @@ int main(void) {
   Population population;
   population_init(&population);
 
-  Agent saved_agent;
-  agent_randomize(&saved_agent);
-
+  Agent saved_agent = {0};
   Agent *best_agent = NULL;
-
-  if (REPLAY_ONLY) {
-    if (!brain_load(&saved_agent.brain, BEST_BRAIN_PATH)) {
-      printf("No saved brain found at %s\n", BEST_BRAIN_PATH);
-      SDL_DestroyRenderer(renderer);
-      SDL_DestroyWindow(window);
-      SDL_Quit();
-      return 1;
-    }
-    printf("Replay mode: loaded saved brain from %s\n", BEST_BRAIN_PATH);
-    best_agent = &saved_agent;
-  } else {
-    if (brain_load(&population.agents[0].brain, BEST_BRAIN_PATH)) {
-      population.agents[0].fitness = 0.0f;
-      population.agents[0].score = 0;
-      population.agents[0].steps = 0;
-
-      printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
-    }
-    best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
+  if (!setup_best_agent(&population, &saved_agent, &best_agent)) {
+    cleanup_sdl(window, renderer);
+    return 1;
   }
 
   Uint32 last_update = SDL_GetTicks();
@@ -196,9 +212,7 @@ int main(void) {
     SDL_Delay(FRAME_DELAY_MS);
   }
 
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  cleanup_sdl(window, renderer);
 
   return 0;
 }

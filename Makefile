@@ -7,6 +7,7 @@ SRC = src/main.c src/game.c src/ai.c src/brain.c src/agent.c src/genetic.c src/r
 OUT = out/snake-ai
 
 all:
+	mkdir -p out
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS) -lm
 
 run: all
