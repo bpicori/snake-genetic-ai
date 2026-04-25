@@ -1,5 +1,7 @@
-#include "genetic.h"
 #include <stdlib.h>
+
+#include "brain.h"
+#include "genetic.h"
 
 static void sort_agents_by_fitness(Agent agents[], int count) {
   for (int i = 0; i < count - 1; i++) {
@@ -142,6 +144,59 @@ void population_next_generation_v1_best_only(Population *population) {
   population->generation++;
 }
 
+/*
+ * Build the next generation using elitism, parent selection, crossover,
+ * and mutation.
+ *
+ * First, sort agents by fitness so the best agents are at the front.
+ *
+ * Example with POPULATION_SIZE = 100, ELITE_COUNT = 5,
+ * and PARENT_POOL_SIZE = 20:
+ *
+ *   agents 0-4:
+ *     copied unchanged from the top 5 agents
+ *
+ *   agents 5-99:
+ *     each one chooses two random parents from agents 0-19,
+ *     mixes their brains using crossover, then mutates the child brain
+ *
+ * Crossover means each brain weight/bias is copied from either parent A or
+ * parent B. Mutation then makes small random changes to the mixed brain.
+ */
+void population_next_generation_v3_crossover(Population *population) {
+  sort_agents_by_fitness(population->agents, POPULATION_SIZE);
+
+  Agent next_agents[POPULATION_SIZE];
+
+  for (int i = 0; i < ELITE_COUNT; i++) {
+    next_agents[i] = population->agents[i];
+  }
+
+  for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
+    int parent_a_index = rand() % PARENT_POOL_SIZE;
+    int parent_b_index = rand() % PARENT_POOL_SIZE;
+
+    next_agents[i].fitness = 0.0f;
+    next_agents[i].score = 0;
+    next_agents[i].steps = 0;
+
+    brain_crossover(&next_agents[i].brain,
+                    &population->agents[parent_a_index].brain,
+                    &population->agents[parent_b_index].brain);
+
+    brain_mutate(&next_agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
+  }
+
+  population->best_agent_index = 0;
+  population->best_fitness = population->agents[0].fitness;
+
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    population->agents[i] = next_agents[i];
+  }
+
+  population->generation++;
+}
+
 void population_next_generation(Population *population) {
-  population_next_generation_v2_elite_parent_pool(population);
+  population_next_generation_v3_crossover(population);
 }

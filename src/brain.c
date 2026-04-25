@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdlib.h>
 
+static bool random_bool(void) { return rand() % 2 == 0; }
+
 static float random_weight(void) {
   return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
 }
@@ -184,5 +186,28 @@ void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
 
   for (int i = 0; i < BRAIN_OUTPUTS; i++) {
     brain->b2[i] = mutate_value(brain->b2[i], mutation_rate, mutation_strength);
+  }
+}
+
+void brain_crossover(Brain *child, const Brain *parent_a,
+                     const Brain *parent_b) {
+  for (int i = 0; i < BRAIN_INPUTS; i++) {
+    for (int j = 0; j < BRAIN_HIDDEN; j++) {
+      child->w1[i][j] = random_bool() ? parent_a->w1[i][j] : parent_b->w1[i][j];
+    }
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    child->b1[i] = random_bool() ? parent_a->b1[i] : parent_b->b1[i];
+  }
+
+  for (int i = 0; i < BRAIN_HIDDEN; i++) {
+    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
+      child->w2[i][j] = random_bool() ? parent_a->w2[i][j] : parent_b->w2[i][j];
+    }
+  }
+
+  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
+    child->b2[i] = random_bool() ? parent_a->b2[i] : parent_b->b2[i];
   }
 }

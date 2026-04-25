@@ -22,4 +22,10 @@ void population_init(Population *population);
 void population_evaluate(Population *population);
 void population_next_generation(Population *population);
 
+void population_next_generation_v1_best_only(Population *population);
+void population_next_generation_v2_elite_parent_pool(Population *population);
+void population_next_generation_v3_crossover(Population *population);
+void population_next_generation_v4_tournament_selection(Population *population);
+void population_next_generation_v5_adaptive_mutation(Population *population);
+
 #endif
