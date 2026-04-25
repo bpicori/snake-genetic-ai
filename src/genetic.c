@@ -1,9 +1,16 @@
 #include "genetic.h"
 
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "brain.h"
+
+typedef struct {
+  Population* population;
+  int start_index;
+  int end_index;
+} EvaluationJob;
 
 /*
  Clamps a float value between a minimum and maximum value.
@@ -40,6 +47,22 @@ static void sort_agents_by_fitness(Agent agents[], int count) {
   }
 }
 
+/*
+ * Selects one parent using tournament selection.
+ *
+ * Instead of choosing only from the top agents, this randomly samples a small
+ * group from the whole population and returns the best agent from that group.
+ *
+ * Example with tournament_size = 3:
+ *   pick agent 14 with fitness 800
+ *   pick agent 63 with fitness 2400
+ *   pick agent 7  with fitness 1200
+ *
+ *   agent 63 wins the tournament and becomes the selected parent.
+ *
+ * Larger tournaments favor stronger agents more aggressively.
+ * Smaller tournaments keep more randomness and diversity.
+ */
 static int tournament_parent_index(const Agent agents[], int tournament_size) {
   int best_index = rand() % POPULATION_SIZE;
 
@@ -92,10 +115,46 @@ static void update_adaptive_mutation(Population* population, float max_rate, flo
     population->stagnant_generations++;
     if (population->stagnant_generations >= STAGNATION_THRESHOLD) {
       population->mutation_rate = clamp_float(population->mutation_rate * stagnation_multiplier, MIN_MUTATION_RATE, max_rate);
-      population->mutation_strength = clamp_float(population->mutation_strength * stagnation_multiplier, MIN_MUTATION_STRENGTH, max_strength);
+      population->mutation_strength =
+          clamp_float(population->mutation_strength * stagnation_multiplier, MIN_MUTATION_STRENGTH, max_strength);
       population->stagnant_generations = 0;
     }
   }
+}
+
+static void evaluate_agent(Agent* agent) {
+  float total_fitness = 0.0f;
+  int best_score = 0;
+  int best_steps = 0;
+  int total_distance_reward = 0;
+  for (int run = 0; run < EVALUATION_GAMES; run++) {
+    Game game;
+    game_init(&game);
+    while (game.alive && game.steps < MAX_GAME_STEPS && game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
+      Direction direction = agent_choose_direction(agent, &game);
+      game_set_direction(&game, direction);
+      game_update(&game);
+    }
+    agent_set_result(agent, &game);
+    total_fitness += agent->fitness;
+    total_distance_reward += game.distance_reward;
+    if (game.score > best_score || (game.score == best_score && game.steps > best_steps)) {
+      best_score = game.score;
+      best_steps = game.steps;
+    }
+  }
+  agent->fitness = total_fitness / EVALUATION_GAMES;
+  agent->score = best_score;
+  agent->steps = best_steps;
+  agent->distance_reward = total_distance_reward / EVALUATION_GAMES;
+}
+
+static void* evaluate_agents_worker(void* arg) {
+  EvaluationJob* job = arg;
+  for (int i = job->start_index; i < job->end_index; i++) {
+    evaluate_agent(&job->population->agents[i]);
+  }
+  return NULL;
 }
 
 void population_init(Population* population) {
@@ -140,36 +199,52 @@ void population_evaluate(Population* population) {
   population->average_fitness = 0.0f;
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    float total_fitness = 0.0f;
-    int best_score = 0;
-    int best_steps = 0;
-    int total_distance_reward = 0;
+    evaluate_agent(&population->agents[i]);
+    population->average_fitness += population->agents[i].fitness;
 
-    for (int run = 0; run < EVALUATION_GAMES; run++) {
-      Game game;
-      game_init(&game);
+    // update the best agent
+    if (population->agents[i].fitness > population->best_fitness) {
+      population->best_fitness = population->agents[i].fitness;
+      population->best_agent_index = i;
+    }
+  }
 
-      while (game.alive && game.steps < MAX_GAME_STEPS && game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
-        Direction direction = agent_choose_direction(&population->agents[i], &game);
-        game_set_direction(&game, direction);
-        game_update(&game);
-      }
+  population->average_fitness /= POPULATION_SIZE;
+}
 
-      agent_set_result(&population->agents[i], &game);
-      total_fitness += population->agents[i].fitness;
-      total_distance_reward += game.distance_reward;
+void population_evaluate_parallel(Population* population) {
+  pthread_t threads[THREAD_COUNT];
+  EvaluationJob jobs[THREAD_COUNT];
 
-      if (game.score > best_score || (game.score == best_score && game.steps > best_steps)) {
-        best_score = game.score;
-        best_steps = game.steps;
-      }
+  int agents_per_thread = POPULATION_SIZE / THREAD_COUNT;
+  int remainder = POPULATION_SIZE % THREAD_COUNT;
+  int start_index = 0;
+
+  for (int i = 0; i < THREAD_COUNT; i++) {
+    int count = agents_per_thread;
+
+    if (i < remainder) {
+      count++;
     }
 
-    population->agents[i].fitness = total_fitness / EVALUATION_GAMES;
-    population->agents[i].score = best_score;
-    population->agents[i].steps = best_steps;
-    population->agents[i].distance_reward = total_distance_reward / EVALUATION_GAMES;
+    jobs[i].population = population;
+    jobs[i].start_index = start_index;
+    jobs[i].end_index = start_index + count;
 
+    pthread_create(&threads[i], NULL, evaluate_agents_worker, &jobs[i]);
+
+    start_index += count;
+  }
+
+  for (int i = 0; i < THREAD_COUNT; i++) {
+    pthread_join(threads[i], NULL);
+  }
+
+  population->best_agent_index = 0;
+  population->best_fitness = 0.0f;
+  population->average_fitness = 0.0f;
+
+  for (int i = 0; i < POPULATION_SIZE; i++) {
     population->average_fitness += population->agents[i].fitness;
 
     if (population->agents[i].fitness > population->best_fitness) {

@@ -27,6 +27,8 @@
 // if fitness improves, reduce mutation
 #define STAGNATION_THRESHOLD 20
 
+#define THREAD_COUNT 4  
+
 typedef enum {
   POPULATION_STRATEGY_BEST_ONLY,
   POPULATION_STRATEGY_ELITE_PARENT_POOL,
@@ -51,6 +53,7 @@ typedef struct {
 
 void population_init(Population* population);
 void population_evaluate(Population* population);
+void population_evaluate_parallel(Population* population);
 void population_next_generation(Population* population, PopulationStrategy strategy);
 const char* population_strategy_name(PopulationStrategy strategy);
 bool population_strategy_from_name(const char* name, PopulationStrategy* strategy);

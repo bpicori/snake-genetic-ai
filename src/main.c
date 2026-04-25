@@ -204,7 +204,7 @@ static Agent* train_generations(Population* population, int count, const AppConf
   Agent* best_agent = NULL;
 
   for (int i = 0; i < count; i++) {
-    population_evaluate(population);
+    population_evaluate_parallel(population);
 
     best_agent = &population->agents[population->best_agent_index];
 
@@ -228,7 +228,7 @@ static Agent* train_generations(Population* population, int count, const AppConf
     population_next_generation(population, config->strategy);
   }
 
-  population_evaluate(population);
+  population_evaluate_parallel(population);
   best_agent = &population->agents[population->best_agent_index];
 
   return best_agent;
