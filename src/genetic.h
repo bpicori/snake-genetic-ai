@@ -8,6 +8,8 @@
 #define MUTATION_RATE 0.05f
 #define MUTATION_STRENGTH 0.2f
 #define MAX_STEPS_WITHOUT_FOOD 100
+#define ELITE_COUNT 5 // top 5 agents survive to the next generation
+#define PARENT_POOL_SIZE 20 // 20 agents are selected to be parents for the next generation
 
 typedef struct {
   Agent agents[POPULATION_SIZE];
