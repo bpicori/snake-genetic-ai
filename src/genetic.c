@@ -12,6 +12,27 @@ typedef struct {
   int end_index;
 } EvaluationJob;
 
+static void agent_randomize(Agent* agent) {
+  brain_randomize(&agent->brain);
+  agent->fitness = 0.0f;
+  agent->score = 0;
+  agent->steps = 0;
+  agent->distance_reward = 0;
+}
+
+static void agent_set_result(Agent* agent, const Game* game) {
+  agent->score = game->score;
+  agent->steps = game->steps;
+  agent->distance_reward = game->distance_reward;
+
+  /*
+   * Fitness is the score used by the genetic algorithm to rank agents.
+   * Eating food is much more valuable than only surviving. Squaring the score
+   * makes higher-scoring snakes stand out strongly during selection.
+   */
+  agent->fitness = (float)((game->score * game->score * 1000) + game->steps + (game->distance_reward * 5));
+}
+
 /*
  Clamps a float value between a minimum and maximum value.
  If the value is less than the minimum, return the minimum.
@@ -131,7 +152,7 @@ static void evaluate_agent(Agent* agent) {
     Game game;
     game_init(&game);
     while (game.alive && game.steps < MAX_GAME_STEPS && game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
-      Direction direction = agent_choose_direction(agent, &game);
+      Direction direction = brain_choose_direction(&agent->brain, &game);
       game_set_direction(&game, direction);
       game_update(&game);
     }

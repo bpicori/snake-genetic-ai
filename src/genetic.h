@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "agent.h"
+#include "brain.h"
 
 #define POPULATION_SIZE 100
 #define MAX_GAME_STEPS 30000
@@ -28,6 +28,14 @@
 #define STAGNATION_THRESHOLD 20
 
 #define THREAD_COUNT 4  
+
+typedef struct {
+  Brain brain;
+  float fitness;
+  int score;
+  int steps;
+  int distance_reward;
+} Agent;
 
 typedef enum {
   POPULATION_STRATEGY_BEST_ONLY,
