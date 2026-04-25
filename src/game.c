@@ -73,6 +73,7 @@ void game_init(Game *game) {
   game->snake.body[0] = (Vec2){5, 5};
   game->snake.direction = RIGHT;
   game->steps_since_food = 0;
+  game->distance_reward = 0;
 
   spawn_food(game);
 
@@ -95,7 +96,7 @@ void game_update(Game *game) {
   Snake *snake = &game->snake;
   Vec2 old_tail = snake->body[snake->length - 1];
   Vec2 new_head = snake->body[0];
-  int old_distance = distance_to_food(game, old_tail);
+  int old_distance = distance_to_food(game, new_head);
 
   // update the snake's head position based on its direction
   switch (snake->direction) {

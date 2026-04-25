@@ -14,6 +14,7 @@ Direction agent_choose_direction(const Agent *agent, const Game *game) {
 void agent_set_result(Agent *agent, const Game *game) {
   agent->score = game->score;
   agent->steps = game->steps;
+  agent->distance_reward = game->distance_reward;
 
   /*
    * Fitness is the score used by the genetic algorithm to rank agents.

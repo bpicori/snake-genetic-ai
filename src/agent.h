@@ -9,6 +9,7 @@ typedef struct {
   float fitness;
   int score;
   int steps;
+  int distance_reward;
 } Agent;
 
 void agent_randomize(Agent *agent);

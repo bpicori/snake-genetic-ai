@@ -21,7 +21,7 @@
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
 #define SNAKE_MOVES_PER_SECOND 30
-#define GENERATIONS_PER_REPLAY 500
+#define GENERATIONS_PER_REPLAY 2000
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
 
 #define BEST_BRAIN_PATH "out/best.brain"
@@ -94,9 +94,9 @@ static Agent *train_generations(Population *population, int count) {
 
     best_agent = &population->agents[population->best_agent_index];
 
-    printf("Generation %d | best fitness %.2f | score %d | steps %d\n",
+    printf("Generation %d | fitness %.2f | score %d | steps %d | distance %d\n",
            population->generation, best_agent->fitness, best_agent->score,
-           best_agent->steps);
+           best_agent->steps, best_agent->distance_reward);
 
     if (best_agent->fitness > best_fitness_ever) {
       best_fitness_ever = best_agent->fitness;
