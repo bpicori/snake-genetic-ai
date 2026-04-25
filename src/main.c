@@ -17,12 +17,12 @@
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
 #define SNAKE_MOVES_PER_SECOND 30
-#define GENERATIONS_PER_REPLAY 2000
+#define GENERATIONS_PER_REPLAY 1000
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
 
 #define BEST_BRAIN_PATH "out/best.brain"
 
-#define REPLAY_ONLY true
+#define REPLAY_ONLY false
 
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;

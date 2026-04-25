@@ -10,6 +10,8 @@
 #define MAX_STEPS_WITHOUT_FOOD 100
 #define ELITE_COUNT 5 // top 5 agents survive to the next generation
 #define PARENT_POOL_SIZE 20 // 20 agents are selected to be parents for the next generation
+#define EVALUATION_GAMES 3 // each agent is evaluated 3 times
+
 
 typedef struct {
   Agent agents[POPULATION_SIZE];

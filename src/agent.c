@@ -5,6 +5,7 @@ void agent_randomize(Agent *agent) {
   agent->fitness = 0.0f;
   agent->score = 0;
   agent->steps = 0;
+  agent->distance_reward = 0;
 }
 
 Direction agent_choose_direction(const Agent *agent, const Game *game) {

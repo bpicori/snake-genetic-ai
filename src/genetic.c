@@ -51,18 +51,39 @@ void population_evaluate(Population *population) {
   population->best_fitness = 0.0f;
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    Game game;
-    game_init(&game);
+    float total_fitness = 0.0f;
+    int best_score = 0;
+    int best_steps = 0;
+    int total_distance_reward = 0;
 
-    while (game.alive && game.steps < MAX_GAME_STEPS &&
-           game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
-      Direction direction =
-          agent_choose_direction(&population->agents[i], &game);
-      game_set_direction(&game, direction);
-      game_update(&game);
+    for (int run = 0; run < EVALUATION_GAMES; run++) {
+      Game game;
+      game_init(&game);
+
+      while (game.alive && game.steps < MAX_GAME_STEPS &&
+             game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
+        Direction direction =
+            agent_choose_direction(&population->agents[i], &game);
+        game_set_direction(&game, direction);
+        game_update(&game);
+      }
+
+      agent_set_result(&population->agents[i], &game);
+      total_fitness += population->agents[i].fitness;
+      total_distance_reward += game.distance_reward;
+
+      if (game.score > best_score ||
+          (game.score == best_score && game.steps > best_steps)) {
+        best_score = game.score;
+        best_steps = game.steps;
+      }
     }
 
-    agent_set_result(&population->agents[i], &game);
+    population->agents[i].fitness = total_fitness / EVALUATION_GAMES; // average fitness over all evaluation games
+    population->agents[i].score = best_score;
+    population->agents[i].steps = best_steps;
+    population->agents[i].distance_reward =
+        total_distance_reward / EVALUATION_GAMES;
 
     if (population->agents[i].fitness > population->best_fitness) {
       population->best_fitness = population->agents[i].fitness;
@@ -98,7 +119,7 @@ void population_next_generation_v2_elite_parent_pool(Population *population) {
     next_agents[i] = population->agents[i];
   }
 
-  for (int i = ELITE_COUNT; i < PARENT_POOL_SIZE; i++) {
+  for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
     int parent_index = rand() % PARENT_POOL_SIZE;
     Agent parent = population->agents[parent_index];
 
