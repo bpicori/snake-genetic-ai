@@ -8,6 +8,7 @@
 #include "agent.h"
 #include "game.h"
 #include "genetic.h"
+#include "render.h"
 
 #define CELL_SIZE 30
 
@@ -26,29 +27,12 @@
 
 #define BEST_BRAIN_PATH "out/best.brain"
 
+#define REPLAY_ONLY true
+
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
 
-void draw_game(SDL_Renderer *renderer, const Game *game) {
-  SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
-  SDL_RenderClear(renderer);
 
-  SDL_SetRenderDrawColor(renderer, 220, 40, 40, 255);
-  SDL_Rect food_rect = {game->food.x * CELL_SIZE, game->food.y * CELL_SIZE,
-                        CELL_SIZE - 1, CELL_SIZE - 1};
-  SDL_RenderFillRect(renderer, &food_rect);
-
-  SDL_SetRenderDrawColor(renderer, 0, 220, 80, 255);
-  for (int i = 0; i < game->snake.length; i++) {
-    SDL_Rect rect = {game->snake.body[i].x * CELL_SIZE,
-                     game->snake.body[i].y * CELL_SIZE, CELL_SIZE - 1,
-                     CELL_SIZE - 1};
-
-    SDL_RenderFillRect(renderer, &rect);
-  }
-
-  SDL_RenderPresent(renderer);
-}
 
 static void handle_input(bool *running, Game *game) {
   SDL_Event event;
@@ -152,15 +136,31 @@ int main(void) {
   Population population;
   population_init(&population);
 
-  if (brain_load(&population.agents[0].brain, BEST_BRAIN_PATH)) {
-    population.agents[0].fitness = 0.0f;
-    population.agents[0].score = 0;
-    population.agents[0].steps = 0;
+  Agent saved_agent;
+  agent_randomize(&saved_agent);
 
-    printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
+  Agent *best_agent = NULL;
+
+  if (REPLAY_ONLY) {
+    if (!brain_load(&saved_agent.brain, BEST_BRAIN_PATH)) {
+      printf("No saved brain found at %s\n", BEST_BRAIN_PATH);
+      SDL_DestroyRenderer(renderer);
+      SDL_DestroyWindow(window);
+      SDL_Quit();
+      return 1;
+    }
+    printf("Replay mode: loaded saved brain from %s\n", BEST_BRAIN_PATH);
+    best_agent = &saved_agent;
+  } else {
+    if (brain_load(&population.agents[0].brain, BEST_BRAIN_PATH)) {
+      population.agents[0].fitness = 0.0f;
+      population.agents[0].score = 0;
+      population.agents[0].steps = 0;
+
+      printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
+    }
+    best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
   }
-
-  Agent *best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
 
   Uint32 last_update = SDL_GetTicks();
   const Uint32 update_delay = SNAKE_UPDATE_DELAY_MS;
@@ -180,15 +180,19 @@ int main(void) {
 
       if (!game.alive || game.steps >= MAX_GAME_STEPS ||
           game.steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
-        population_next_generation(&population);
-        best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
-        game_init(&game);
+        if (REPLAY_ONLY) {
+          game_init(&game);
+        } else {
+          population_next_generation(&population);
+          best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
+          game_init(&game);
+        }
       }
 
       last_update = now;
     }
 
-    draw_game(renderer, &game);
+    render_game(renderer, &game);
     SDL_Delay(FRAME_DELAY_MS);
   }
 
