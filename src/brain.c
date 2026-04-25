@@ -2,12 +2,23 @@
 #include <math.h>
 #include <stdlib.h>
 
+// Returns true or false randomly with about 50% chance.
 static bool random_bool(void) { return rand() % 2 == 0; }
 
+// Creates a random neural-network weight between -1.0 and 1.0.
 static float random_weight(void) {
   return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
 }
 
+// Returns a random float between 0.0 and 1.0.
+static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
+
+// Creates a small random change between -mutation_strength and
+// +mutation_strength.
+static float random_mutation(float mutation_strength) {
+  return (random_float() * 2.0f - 1.0f) * mutation_strength;
+}
+// Converts the current direction into the direction produced by turning left.
 static Direction turn_left(Direction direction) {
   switch (direction) {
   case UP:
@@ -21,6 +32,8 @@ static Direction turn_left(Direction direction) {
   }
   return direction;
 }
+
+// Converts the current direction into the direction produced by turning right.
 static Direction turn_right(Direction direction) {
   switch (direction) {
   case UP:
@@ -35,6 +48,13 @@ static Direction turn_right(Direction direction) {
   return direction;
 }
 
+/*
+ * Converts a neural-network action into an actual game direction.
+ *
+ * action 0 = turn left
+ * action 1 = keep going straight
+ * action 2 = turn right
+ */
 static Direction direction_from_action(Direction current, int action) {
   if (action == 0) {
     return turn_left(current);
@@ -47,6 +67,12 @@ static Direction direction_from_action(Direction current, int action) {
   return current;
 }
 
+/*
+ * Converts the current Game state into the 11 input values used by the brain.
+ *
+ * The inputs describe nearby danger, current movement direction, and where the
+ * food is relative to the snake head.
+ */
 static void build_inputs(const Game *game, float inputs[BRAIN_INPUTS]) {
   Direction current = game->snake.direction;
   Vec2 head = game->snake.body[0];
@@ -68,12 +94,23 @@ static void build_inputs(const Game *game, float inputs[BRAIN_INPUTS]) {
   inputs[10] = game->food.x > head.x ? 1.0f : 0.0f;
 }
 
-static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
-
-static float random_mutation(float mutation_strength) {
-  return (random_float() * 2.0f - 1.0f) * mutation_strength;
-}
-
+/*
+ * Mutates one weight or bias value.
+ *
+ * mutation_rate controls the chance that the value changes.
+ * mutation_strength controls how large the change can be.
+ *
+ * Example:
+ *   value = 0.70
+ *   mutation_rate = 0.05      // 5% chance this value changes
+ *   mutation_strength = 0.20  // change is between -0.20 and +0.20
+ *
+ * If this value is selected for mutation:
+ *   random change = -0.13
+ *   new value = 0.70 + (-0.13) = 0.57
+ *
+ * If it is not selected, it stays 0.70.
+ */
 static float mutate_value(float value, float mutation_rate,
                           float mutation_strength) {
   if (random_float() < mutation_rate) {
@@ -83,6 +120,12 @@ static float mutate_value(float value, float mutation_rate,
   return value;
 }
 
+/*
+ * Fills a brain with random weights and biases.
+ *
+ * This is used when creating the first generation of agents before any
+ * evolution has happened.
+ */
 void brain_randomize(Brain *brain) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
@@ -105,6 +148,16 @@ void brain_randomize(Brain *brain) {
   }
 }
 
+/*
+ * Runs the neural network and chooses the snake's next direction.
+ *
+ * Flow:
+ *   1. Build input values from the game state.
+ *   2. Compute hidden neuron values.
+ *   3. Compute output scores.
+ *   4. Pick the highest-scoring output.
+ *   5. Convert that output into left, straight, or right movement.
+ */
 Direction brain_choose_direction(const Brain *brain, const Game *game) {
   float inputs[BRAIN_INPUTS];
   float hidden[BRAIN_HIDDEN];
@@ -143,6 +196,11 @@ Direction brain_choose_direction(const Brain *brain, const Game *game) {
   return direction_from_action(game->snake.direction, best_action);
 }
 
+/*
+ * Copies all weights and biases from one brain to another.
+ *
+ * Used when an agent survives unchanged or when creating a child from a parent.
+ */
 void brain_copy(Brain *dest, const Brain *src) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
@@ -164,7 +222,12 @@ void brain_copy(Brain *dest, const Brain *src) {
     dest->b2[i] = src->b2[i];
   }
 }
-
+/*
+ * Applies random mutations to all weights and biases in the brain.
+ *
+ * Most values stay unchanged. A few values are nudged slightly, which creates
+ * variation between generations.
+ */
 void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
@@ -189,6 +252,12 @@ void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
   }
 }
 
+/*
+ * Creates a child brain from two parent brains.
+ *
+ * For every weight and bias, the child randomly inherits the value from either
+ * parent A or parent B. Mutation can be applied afterward.
+ */
 void brain_crossover(Brain *child, const Brain *parent_a,
                      const Brain *parent_b) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {

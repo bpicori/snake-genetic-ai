@@ -40,6 +40,19 @@ static Vec2 next_head_for_direction(const Game *game, Direction direction) {
   return head;
 }
 
+// Manhattan distance to the food
+static int distance_to_food(const Game *game, Vec2 position) {
+  int dx = game->food.x - position.x;
+  int dy = game->food.y - position.y;
+
+  if (dx < 0)
+    dx = -dx;
+  if (dy < 0)
+    dy = -dy;
+
+  return dx + dy;
+}
+
 bool game_is_direction_safe(const Game *game, Direction direction) {
   Vec2 next_head = next_head_for_direction(game, direction);
   if (next_head.x < 0 || next_head.x >= GRID_WIDTH || next_head.y < 0 ||
@@ -82,6 +95,7 @@ void game_update(Game *game) {
   Snake *snake = &game->snake;
   Vec2 old_tail = snake->body[snake->length - 1];
   Vec2 new_head = snake->body[0];
+  int old_distance = distance_to_food(game, old_tail);
 
   // update the snake's head position based on its direction
   switch (snake->direction) {
@@ -121,8 +135,16 @@ void game_update(Game *game) {
   }
 
   snake->body[0] = new_head;
+
   game->steps++;
   game->steps_since_food++;
+
+  int new_distance = distance_to_food(game, new_head);
+  if (new_distance < old_distance) {
+    game->distance_reward++;
+  } else if (new_distance > old_distance) {
+    game->distance_reward--;
+  }
 
   if (will_eat_food) {
     game->score++;

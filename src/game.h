@@ -28,6 +28,7 @@ typedef struct {
   bool alive;
   int steps;
   int steps_since_food;
+  int distance_reward;
 } Game;
 
 void game_init(Game *game);
