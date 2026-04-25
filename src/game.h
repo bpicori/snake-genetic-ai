@@ -32,5 +32,7 @@ typedef struct {
 void game_init(Game *game);
 void game_update(Game *game);
 void game_set_direction(Game *game, Direction direction);
+bool game_is_direction_safe(const Game *game, Direction direction);
+
 
 #endif

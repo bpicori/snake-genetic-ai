@@ -1,3 +1,4 @@
+#include "SDL_keycode.h"
 #include "SDL_render.h"
 #include "SDL_video.h"
 #include "game.h"
@@ -16,8 +17,10 @@
 #define RENDER_FPS 60
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
-#define SNAKE_MOVES_PER_SECOND 6
+#define SNAKE_MOVES_PER_SECOND 15
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
+
+bool ai_enabled = true;
 
 void draw_game(SDL_Renderer *renderer, const Game *game) {
   SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
@@ -65,9 +68,46 @@ static void handle_input(bool *running, Game *game) {
       case SDLK_ESCAPE:
         *running = false;
         break;
+      case SDLK_SPACE:
+        ai_enabled = !ai_enabled;
+        break;
+      case SDLK_r:
+        game_init(game);
+        break;
       }
     }
   }
+}
+
+static Direction choose_direction_toward_food(const Game *game) {
+  Vec2 head = game->snake.body[0];
+
+  Direction preferred[6];
+  int count = 0;
+
+  if (game->food.x > head.x) {
+    preferred[count++] = RIGHT;
+  } else if (game->food.x < head.x) {
+    preferred[count++] = LEFT;
+  }
+  if (game->food.y > head.y) {
+    preferred[count++] = DOWN;
+  } else if (game->food.y < head.y) {
+    preferred[count++] = UP;
+  }
+
+  preferred[count++] = UP;
+  preferred[count++] = RIGHT;
+  preferred[count++] = DOWN;
+  preferred[count++] = LEFT;
+
+  for (int i = 0; i < count; i++) {
+    if (game_is_direction_safe(game, preferred[i])) {
+      return preferred[i];
+    }
+  }
+
+  return game->snake.direction;
 }
 
 int main(void) {
@@ -112,6 +152,11 @@ int main(void) {
     Uint32 now = SDL_GetTicks();
 
     if (now - last_update >= update_delay) {
+      if (ai_enabled) {
+        Direction direction = choose_direction_toward_food(&game);
+        game_set_direction(&game, direction);
+      }
+
       game_update(&game);
       last_update = now;
     }

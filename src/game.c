@@ -21,9 +21,43 @@ static void spawn_food(Game *game) {
   game->food = position;
 }
 
+static Vec2 next_head_for_direction(const Game *game, Direction direction) {
+  Vec2 head = game->snake.body[0];
+  switch (direction) {
+  case UP:
+    head.y -= 1;
+    break;
+  case DOWN:
+    head.y += 1;
+    break;
+  case LEFT:
+    head.x -= 1;
+    break;
+  case RIGHT:
+    head.x += 1;
+    break;
+  }
+  return head;
+}
+
+bool game_is_direction_safe(const Game *game, Direction direction) {
+  Vec2 next_head = next_head_for_direction(game, direction);
+  if (next_head.x < 0 || next_head.x >= GRID_WIDTH || next_head.y < 0 ||
+      next_head.y >= GRID_HEIGHT) {
+    return false;
+  }
+  const Snake *snake = &game->snake;
+  for (int i = 1; i < snake->length; i++) {
+    if (snake->body[i].x == next_head.x && snake->body[i].y == next_head.y) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void game_init(Game *game) {
   game->snake.length = 1;
-  game->snake.body[0] = (Vec2){10, 10};
+  game->snake.body[0] = (Vec2){5, 5};
   game->snake.direction = RIGHT;
 
   spawn_food(game);
