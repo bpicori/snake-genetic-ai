@@ -24,7 +24,10 @@
 #define GENERATIONS_PER_REPLAY 500
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
 
+#define BEST_BRAIN_PATH "out/best.brain"
+
 bool ai_enabled = true;
+static float best_fitness_ever = 0.0f;
 
 void draw_game(SDL_Renderer *renderer, const Game *game) {
   SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
@@ -95,6 +98,15 @@ static Agent *train_generations(Population *population, int count) {
            population->generation, best_agent->fitness, best_agent->score,
            best_agent->steps);
 
+    if (best_agent->fitness > best_fitness_ever) {
+      best_fitness_ever = best_agent->fitness;
+      if (brain_save(&best_agent->brain, BEST_BRAIN_PATH)) {
+        printf("Best brain saved to %s\n", BEST_BRAIN_PATH);
+      } else {
+        printf("Failed to save best brain to %s\n", BEST_BRAIN_PATH);
+      }
+    }
+
     population_next_generation(population);
   }
 
@@ -139,6 +151,14 @@ int main(void) {
 
   Population population;
   population_init(&population);
+
+  if (brain_load(&population.agents[0].brain, BEST_BRAIN_PATH)) {
+    population.agents[0].fitness = 0.0f;
+    population.agents[0].score = 0;
+    population.agents[0].steps = 0;
+
+    printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
+  }
 
   Agent *best_agent = train_generations(&population, GENERATIONS_PER_REPLAY);
 

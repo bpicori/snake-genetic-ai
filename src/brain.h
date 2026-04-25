@@ -51,5 +51,7 @@ Direction brain_choose_direction(const Brain *brain, const Game *game);
 void brain_copy(Brain *dest, const Brain *src);
 void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength);
 void brain_crossover(Brain *child, const Brain *parent_a, const Brain *parent_b);
+bool brain_save(const Brain *brain, const char *path);
+bool brain_load(Brain *brain, const char *path);
 
 #endif

@@ -280,3 +280,39 @@ void brain_crossover(Brain *child, const Brain *parent_a,
     child->b2[i] = random_bool() ? parent_a->b2[i] : parent_b->b2[i];
   }
 }
+
+/*
+ * Saves the brain's weights and biases to a binary file.
+ *
+ * This lets us keep the best trained brain after the program exits.
+ */
+bool brain_save(const Brain *brain, const char *path) {
+  FILE *file = fopen(path, "wb");
+
+  if (file == NULL) {
+    return false;
+  }
+
+  size_t written = fwrite(brain, sizeof(Brain), 1, file);
+  fclose(file);
+
+  return written == 1;
+}
+
+/*
+ * Loads previously saved weights and biases from a binary file.
+ *
+ * Returns false if the file does not exist or cannot be read.
+ */
+bool brain_load(Brain *brain, const char *path) {
+  FILE *file = fopen(path, "rb");
+
+  if (file == NULL) {
+    return false;
+  }
+
+  size_t read = fread(brain, sizeof(Brain), 1, file);
+  fclose(file);
+
+  return read == 1;
+}

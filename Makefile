@@ -4,7 +4,7 @@ SDL_CFLAGS = $(shell sdl2-config --cflags)
 SDL_LIBS = $(shell sdl2-config --libs)
 
 SRC = src/main.c src/game.c src/ai.c src/brain.c src/agent.c src/genetic.c
-OUT = bin/snake-ai
+OUT = out/snake-ai
 
 all:
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS) -lm
