@@ -2,6 +2,7 @@
 #include "SDL_render.h"
 #include "SDL_video.h"
 #include "ai.h"
+#include "brain.h"
 #include "game.h"
 #include <SDL.h>
 #include <stdbool.h>
@@ -113,6 +114,9 @@ int main(void) {
   Game game;
   game_init(&game);
 
+  Brain brain;
+  brain_randomize(&brain);
+
   Uint32 last_update = SDL_GetTicks();
   const Uint32 update_delay = SNAKE_UPDATE_DELAY_MS;
 
@@ -123,7 +127,7 @@ int main(void) {
 
     if (now - last_update >= update_delay) {
       if (ai_enabled) {
-        Direction direction = choose_direction_toward_food(&game);
+        Direction direction = brain_choose_direction(&brain, &game);
         game_set_direction(&game, direction);
       }
 

@@ -7,7 +7,7 @@ SRC = src/main.c src/game.c src/ai.c src/brain.c
 OUT = bin/snake-ai
 
 all:
-	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS)
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS) -lm
 
 run: all
 	./$(OUT)
