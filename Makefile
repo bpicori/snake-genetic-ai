@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -Wall -Wextra -std=c99 -O3 -march=native
+CFLAGS = -Wall -Wextra -std=c99 -O3 -march=native -pthread
 SDL_CFLAGS = $(shell sdl2-config --cflags)
 SDL_LIBS = $(shell sdl2-config --libs)
 
@@ -8,7 +8,7 @@ OUT = out/snake-ai
 
 all:
 	mkdir -p out
-	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS) -lm
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(SRC) -o $(OUT) $(SDL_LIBS) -lm -pthread
 
 run: all
 	./$(OUT)

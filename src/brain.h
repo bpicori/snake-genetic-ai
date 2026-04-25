@@ -6,7 +6,7 @@
 /*
  * Neural network input layout.
  *
- * The brain receives a compact snapshot of the current game state as 19 float
+ * The brain receives a compact snapshot of the current game state as 22 float
  * values. Some values are booleans represented as 0.0f or 1.0f; the rest are
  * normalized distances.
  *

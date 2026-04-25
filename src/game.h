@@ -1,7 +1,6 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include <SDL.h>
 #include <stdbool.h>
 
 #define GRID_WIDTH 20

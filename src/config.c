@@ -21,6 +21,19 @@ void app_config_print_usage(const char* program_name) {
   printf("  --seed <value>       use a fixed random seed for reproducible runs\n");
 }
 
+static bool parse_positive_int(const char* value, int* result) {
+  char* end = NULL;
+  errno = 0;
+  long parsed = strtol(value, &end, 10);
+
+  if (errno != 0 || end == value || *end != '\0' || parsed <= 0 || parsed > INT_MAX) {
+    return false;
+  }
+
+  *result = (int)parsed;
+  return true;
+}
+
 AppConfigParseResult app_config_parse(int argc, char* argv[], AppConfig* config) {
   config->replay_only = true;
   config->no_render = false;
@@ -44,8 +57,7 @@ AppConfigParseResult app_config_parse(int argc, char* argv[], AppConfig* config)
         return APP_CONFIG_PARSE_ERROR;
       }
 
-      config->generations = atoi(argv[i + 1]);
-      if (config->generations <= 0) {
+      if (!parse_positive_int(argv[i + 1], &config->generations)) {
         fprintf(stderr, "Generation count must be greater than zero.\n");
         app_config_print_usage(argv[0]);
         return APP_CONFIG_PARSE_ERROR;
@@ -94,6 +106,18 @@ AppConfigParseResult app_config_parse(int argc, char* argv[], AppConfig* config)
       app_config_print_usage(argv[0]);
       return APP_CONFIG_PARSE_ERROR;
     }
+  }
+
+  if (!config->replay_only && !config->no_render) {
+    fprintf(stderr, "Training must be run with --no-render.\n");
+    app_config_print_usage(argv[0]);
+    return APP_CONFIG_PARSE_ERROR;
+  }
+
+  if (config->replay_only && config->no_render) {
+    fprintf(stderr, "--no-render is only supported with --train.\n");
+    app_config_print_usage(argv[0]);
+    return APP_CONFIG_PARSE_ERROR;
   }
 
   return APP_CONFIG_PARSE_OK;

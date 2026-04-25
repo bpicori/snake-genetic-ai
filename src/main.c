@@ -2,9 +2,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "SDL_keycode.h"
-#include "SDL_render.h"
-#include "SDL_video.h"
 #include "brain.h"
 #include "config.h"
 #include "game.h"

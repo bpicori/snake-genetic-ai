@@ -1,6 +1,7 @@
 #include "brain.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // Returns true or false randomly with about 50% chance.

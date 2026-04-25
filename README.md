@@ -1,4 +1,4 @@
-# Snake AI
+# Snake Genetic AI
 
 A small C project where Snake learns through a neural network and a genetic algorithm.
 
