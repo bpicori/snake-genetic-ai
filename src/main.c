@@ -1,16 +1,12 @@
 #include <SDL.h>
-#include <errno.h>
-#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 #include "SDL_keycode.h"
 #include "SDL_render.h"
 #include "SDL_video.h"
 #include "agent.h"
+#include "config.h"
 #include "game.h"
 #include "genetic.h"
 #include "render.h"
@@ -22,133 +18,10 @@
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
 #define SNAKE_MOVES_PER_SECOND 120
-#define DEFAULT_GENERATIONS 500
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
-
-#define DEFAULT_BRAIN_PATH "out/best.brain"
 
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
-
-typedef struct {
-  bool replay_only;
-  bool no_render;
-  int generations;
-  const char* brain_path;
-  const char* csv_path;
-  PopulationStrategy strategy;
-  bool seed_provided;
-  unsigned int seed;
-} AppConfig;
-
-static void print_usage(const char* program_name) {
-  printf(
-      "Usage: %s [--train|--replay] [--no-render] [--generations count] "
-      "[--brain path] [--csv path] [--strategy v1|v2|v3|v4|adaptive|adaptive-conservative] [--seed value]\n",
-      program_name);
-  printf("  --train              train and periodically replay the best brain (default)\n");
-  printf("  --replay             load the saved brain and replay without training\n");
-  printf("  --no-render          train without opening an SDL window\n");
-  printf("  --generations <n>    generations to train per batch, or total in --no-render mode\n");
-  printf("  --brain <path>       brain file to load/save (default: out/best.brain)\n");
-  printf("  --csv <path>         write training metrics to a CSV file\n");
-  printf("  --strategy <name>    choose v1, v2, v3, v4, adaptive, or adaptive-conservative\n");
-  printf("  --seed <value>       use a fixed random seed for reproducible runs\n");
-}
-
-static bool parse_args(int argc, char* argv[], AppConfig* config) {
-  config->replay_only = false;
-  config->no_render = false;
-  config->generations = DEFAULT_GENERATIONS;
-  config->brain_path = DEFAULT_BRAIN_PATH;
-  config->csv_path = NULL;
-  config->strategy = POPULATION_STRATEGY_ADAPTIVE_MUTATION;
-  config->seed_provided = false;
-  config->seed = 0;
-
-  for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--train") == 0) {
-      config->replay_only = false;
-    } else if (strcmp(argv[i], "--replay") == 0) {
-      config->replay_only = true;
-    } else if (strcmp(argv[i], "--no-render") == 0) {
-      config->no_render = true;
-    } else if (strcmp(argv[i], "--generations") == 0) {
-      if (i + 1 >= argc) {
-        fprintf(stderr, "Missing generation count.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-
-      config->generations = atoi(argv[i + 1]);
-      if (config->generations <= 0) {
-        fprintf(stderr, "Generation count must be greater than zero.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-      i++;
-    } else if (strcmp(argv[i], "--brain") == 0) {
-      if (i + 1 >= argc) {
-        fprintf(stderr, "Missing brain path.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-
-      config->brain_path = argv[i + 1];
-      i++;
-    } else if (strcmp(argv[i], "--csv") == 0) {
-      if (i + 1 >= argc) {
-        fprintf(stderr, "Missing CSV path.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-
-      config->csv_path = argv[i + 1];
-      i++;
-    } else if (strcmp(argv[i], "--strategy") == 0) {
-      if (i + 1 >= argc || !population_strategy_from_name(argv[i + 1], &config->strategy)) {
-        fprintf(stderr, "Invalid or missing strategy.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-      i++;
-    } else if (strcmp(argv[i], "--seed") == 0) {
-      if (i + 1 >= argc) {
-        fprintf(stderr, "Missing seed value.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-
-      char* end = NULL;
-      errno = 0;
-      unsigned long seed = strtoul(argv[i + 1], &end, 10);
-      if (errno != 0 || end == argv[i + 1] || *end != '\0' || seed > UINT_MAX) {
-        fprintf(stderr, "Seed must be an unsigned integer.\n");
-        print_usage(argv[0]);
-        return false;
-      }
-
-      config->seed_provided = true;
-      config->seed = (unsigned int)seed;
-      i++;
-    } else if (strcmp(argv[i], "--help") == 0) {
-      print_usage(argv[0]);
-      return false;
-    } else {
-      fprintf(stderr, "Unknown argument: %s\n", argv[i]);
-      print_usage(argv[0]);
-      return false;
-    }
-  }
-
-  return true;
-}
-
-static void seed_random(const AppConfig* config) {
-  unsigned int seed = config->seed_provided ? config->seed : (unsigned int)time(NULL);
-  srand(seed);
-  printf("Random seed: %u%s\n", seed, config->seed_provided ? " (fixed)" : "");
-}
 
 static bool init_sdl(SDL_Window** window, SDL_Renderer** renderer) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -218,22 +91,7 @@ static void handle_input(bool* running, Game* game) {
   }
 }
 
-static void write_csv_header(FILE* csv_file) {
-  if (csv_file != NULL) {
-    fprintf(csv_file, "generation,strategy,best_fitness,average_fitness,score,steps,distance_reward,mutation_rate,mutation_strength\n");
-  }
-}
-
-static void write_csv_row(FILE* csv_file, const Population* population, const Agent* best_agent, PopulationStrategy strategy) {
-  if (csv_file != NULL) {
-    fprintf(
-        csv_file, "%d,%s,%.2f,%.2f,%d,%d,%d,%.3f,%.3f\n", population->generation, population_strategy_name(strategy),
-        best_agent->fitness, population->average_fitness, best_agent->score, best_agent->steps, best_agent->distance_reward,
-        population->mutation_rate, population->mutation_strength);
-  }
-}
-
-static Agent* train_generations(Population* population, int count, const AppConfig* config, FILE* csv_file) {
+static Agent* train_generations(Population* population, int count, const AppConfig* config) {
   Agent* best_agent = NULL;
 
   for (int i = 0; i < count; i++) {
@@ -246,8 +104,6 @@ static Agent* train_generations(Population* population, int count, const AppConf
         "mutation %.3f %.3f\n",
         population_strategy_name(config->strategy), population->generation, best_agent->fitness, population->average_fitness,
         best_agent->score, best_agent->steps, best_agent->distance_reward, population->mutation_rate, population->mutation_strength);
-
-    write_csv_row(csv_file, population, best_agent, config->strategy);
 
     if (best_agent->fitness > best_fitness_ever) {
       best_fitness_ever = best_agent->fitness;
@@ -290,7 +146,7 @@ static bool setup_best_agent(Population* population, Agent* saved_agent, Agent**
   return true;
 }
 
-static void update_simulation(Game* game, Agent** best_agent, Population* population, const AppConfig* config, FILE* csv_file) {
+static void update_simulation(Game* game, Agent** best_agent, Population* population, const AppConfig* config) {
   if (ai_enabled) {
     Direction direction = agent_choose_direction(*best_agent, game);
     game_set_direction(game, direction);
@@ -303,7 +159,7 @@ static void update_simulation(Game* game, Agent** best_agent, Population* popula
       game_init(game);
     } else {
       population_next_generation(population, config->strategy);
-      *best_agent = train_generations(population, config->generations, config, csv_file);
+      *best_agent = train_generations(population, config->generations, config);
       game_init(game);
     }
   }
@@ -323,16 +179,6 @@ static int run_headless_training(const AppConfig* config) {
     return 1;
   }
 
-  FILE* csv_file = NULL;
-  if (config->csv_path != NULL) {
-    csv_file = fopen(config->csv_path, "w");
-    if (csv_file == NULL) {
-      fprintf(stderr, "Failed to open CSV file: %s\n", config->csv_path);
-      return 1;
-    }
-    write_csv_header(csv_file);
-  }
-
   Population population;
   population_init(&population);
 
@@ -343,33 +189,23 @@ static int run_headless_training(const AppConfig* config) {
     printf("Best brain loaded from %s\n", config->brain_path);
   }
 
-  train_generations(&population, config->generations, config, csv_file);
-
-  if (csv_file != NULL) {
-    fclose(csv_file);
-  }
+  train_generations(&population, config->generations, config);
 
   return 0;
 }
 
 int main(int argc, char* argv[]) {
-  for (int i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--help") == 0) {
-      print_usage(argv[0]);
-      return 0;
-    }
-  }
-
   AppConfig config;
-  if (!parse_args(argc, argv, &config)) {
+  AppConfigParseResult parse_result = app_config_parse(argc, argv, &config);
+  if (parse_result == APP_CONFIG_PARSE_HELP) {
+    return 0;
+  }
+  if (parse_result == APP_CONFIG_PARSE_ERROR) {
     return 1;
   }
 
-  seed_random(&config);
-
-  printf(
-      "Mode: %s | strategy: %s | generations: %d | brain: %s\n", config.replay_only ? "replay" : "train",
-      population_strategy_name(config.strategy), config.generations, config.brain_path);
+  app_config_seed_random(&config);
+  app_config_print_summary(&config);
 
   if (config.no_render) {
     return run_headless_training(&config);
@@ -389,29 +225,15 @@ int main(int argc, char* argv[]) {
   Population population;
   population_init(&population);
 
-  FILE* csv_file = NULL;
-  if (config.csv_path != NULL) {
-    csv_file = fopen(config.csv_path, "w");
-    if (csv_file == NULL) {
-      fprintf(stderr, "Failed to open CSV file: %s\n", config.csv_path);
-      cleanup_sdl(window, renderer);
-      return 1;
-    }
-    write_csv_header(csv_file);
-  }
-
   Agent saved_agent = {0};
   Agent* best_agent = NULL;
   if (!setup_best_agent(&population, &saved_agent, &best_agent, &config)) {
-    if (csv_file != NULL) {
-      fclose(csv_file);
-    }
     cleanup_sdl(window, renderer);
     return 1;
   }
 
   if (!config.replay_only) {
-    best_agent = train_generations(&population, config.generations, &config, csv_file);
+    best_agent = train_generations(&population, config.generations, &config);
   }
 
   Uint32 last_update = SDL_GetTicks();
@@ -423,17 +245,13 @@ int main(int argc, char* argv[]) {
     Uint32 now = SDL_GetTicks();
 
     if (now - last_update >= update_delay) {
-      update_simulation(&game, &best_agent, &population, &config, csv_file);
+      update_simulation(&game, &best_agent, &population, &config);
       update_window_title(window, &game);
       last_update = now;
     }
 
     render_game(renderer, &game);
     SDL_Delay(FRAME_DELAY_MS);
-  }
-
-  if (csv_file != NULL) {
-    fclose(csv_file);
   }
 
   cleanup_sdl(window, renderer);

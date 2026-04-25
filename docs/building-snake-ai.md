@@ -523,7 +523,7 @@ food_dy = (food.y - head.y) / GRID_HEIGHT
 - brain inputs include normalized wall and body distances for straight, left,
   and right movement
 - command-line flags select training, replay, no-render training, generation
-  count, brain file, CSV log file, genetic strategy, and random seed
+  count, brain file, genetic strategy, and random seed
 - logs include strategy name, best fitness, average fitness, score, steps,
   distance reward, and mutation settings
 
@@ -539,9 +539,9 @@ Useful commands:
 ./out/snake-ai --train --strategy adaptive
 ./out/snake-ai --train --strategy adaptive-conservative
 ./out/snake-ai --no-render --generations 1000 --strategy adaptive
-./out/snake-ai --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain --csv out/adaptive-conservative.csv
-./out/snake-ai --no-render --generations 1000 --strategy v3 --brain out/v3.brain --csv out/v3.csv
-./out/snake-ai --no-render --generations 1000 --strategy adaptive --seed 12345 --brain out/adaptive-seed-12345.brain --csv out/adaptive-seed-12345.csv
+./out/snake-ai --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain
+./out/snake-ai --no-render --generations 1000 --strategy v3 --brain out/v3.brain
+./out/snake-ai --no-render --generations 1000 --strategy adaptive --seed 12345 --brain out/adaptive-seed-12345.brain
 ```
 
 Good next experiments:
@@ -549,4 +549,3 @@ Good next experiments:
 - compare V1, V2, V3, V4, adaptive mutation, and conservative adaptive mutation
   over the same number of generations
 - try parallel population evaluation after the strategy comparison is stable
-- plot CSV logs to compare strategies visually
