@@ -16,7 +16,7 @@
 #define RENDER_FPS 60
 #define FRAME_DELAY_MS (1000 / RENDER_FPS)
 
-#define SNAKE_MOVES_PER_SECOND 120
+#define SNAKE_MOVES_PER_SECOND 240
 #define SNAKE_UPDATE_DELAY_MS (1000 / SNAKE_MOVES_PER_SECOND)
 
 static bool init_sdl(SDL_Window** window, SDL_Renderer** renderer) {
@@ -69,20 +69,17 @@ static void handle_input(bool* running) {
   }
 }
 
-static void update_simulation(Game* game, TrainingSession* session, const AppConfig* config) {
+static bool update_simulation(Game* game, TrainingSession* session) {
   Direction direction = brain_choose_direction(&training_session_best_agent(session)->brain, game);
   game_set_direction(game, direction);
 
   game_update(game);
 
   if (!game->alive || game->steps >= MAX_GAME_STEPS || game->steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
-    if (config->replay_only) {
-      game_init(game);
-    } else {
-      training_session_train_after_game_over(session, config);
-      game_init(game);
-    }
+    return false;
   }
+
+  return true;
 }
 
 static void update_window_title(SDL_Window* window, const Game* game) {
@@ -110,6 +107,11 @@ int main(int argc, char* argv[]) {
     return training_run_headless(&config);
   }
 
+  if (!config.replay_only) {
+    fprintf(stderr, "Rendered training is not supported. Use --train --no-render, or use --replay to watch a saved brain.\n");
+    return 1;
+  }
+
   SDL_Window* window = NULL;
   SDL_Renderer* renderer = NULL;
   if (!init_sdl(&window, &renderer)) {
@@ -127,20 +129,17 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (!config.replay_only) {
-    training_session_train_generations(&training_session, config.generations, &config);
-  }
-
   Uint32 last_update = SDL_GetTicks();
   const Uint32 update_delay = SNAKE_UPDATE_DELAY_MS;
+  bool simulation_active = true;
 
   while (running) {
     handle_input(&running);
 
     Uint32 now = SDL_GetTicks();
 
-    if (now - last_update >= update_delay) {
-      update_simulation(&game, &training_session, &config);
+    if (simulation_active && now - last_update >= update_delay) {
+      simulation_active = update_simulation(&game, &training_session);
       update_window_title(window, &game);
       last_update = now;
     }

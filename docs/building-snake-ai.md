@@ -522,7 +522,7 @@ food_dy = (food.y - head.y) / GRID_HEIGHT
 - fitness now uses squared score reward: `score * score * 1000`
 - brain inputs include normalized wall and body distances for straight, left,
   and right movement
-- command-line flags select training, replay, no-render training, generation
+- command-line flags select headless training, replay, generation
   count, brain file, genetic strategy, and random seed
 - logs include strategy name, best fitness, average fitness, score, steps,
   distance reward, and mutation settings
@@ -530,18 +530,12 @@ food_dy = (food.y - head.y) / GRID_HEIGHT
 Useful commands:
 
 ```text
-./out/snake-ai --train
 ./out/snake-ai --replay
-./out/snake-ai --train --strategy v1
-./out/snake-ai --train --strategy v2
-./out/snake-ai --train --strategy v3
-./out/snake-ai --train --strategy v4
-./out/snake-ai --train --strategy adaptive
-./out/snake-ai --train --strategy adaptive-conservative
-./out/snake-ai --no-render --generations 1000 --strategy adaptive
-./out/snake-ai --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain
-./out/snake-ai --no-render --generations 1000 --strategy v3 --brain out/v3.brain
-./out/snake-ai --no-render --generations 1000 --strategy adaptive --seed 12345 --brain out/adaptive-seed-12345.brain
+./out/snake-ai --replay --brain out/best.brain
+./out/snake-ai --train --no-render --generations 1000 --strategy adaptive
+./out/snake-ai --train --no-render --generations 1000 --strategy adaptive-conservative --brain out/adaptive-conservative.brain
+./out/snake-ai --train --no-render --generations 1000 --strategy v3 --brain out/v3.brain
+./out/snake-ai --train --no-render --generations 1000 --strategy adaptive --seed 12345 --brain out/adaptive-seed-12345.brain
 ```
 
 Good next experiments:

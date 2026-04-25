@@ -9,20 +9,20 @@
 
 void app_config_print_usage(const char* program_name) {
   printf(
-      "Usage: %s [--train|--replay] [--no-render] [--generations count] "
+      "Usage: %s (--train --no-render | --replay) [--generations count] "
       "[--brain path] [--strategy v1|v2|v3|v4|adaptive|adaptive-conservative] [--seed value]\n",
       program_name);
-  printf("  --train              train and periodically replay the best brain (default)\n");
-  printf("  --replay             load the saved brain and replay without training\n");
-  printf("  --no-render          train without opening an SDL window\n");
-  printf("  --generations <n>    generations to train per batch, or total in --no-render mode\n");
+  printf("  --train              train the genetic algorithm; must be used with --no-render\n");
+  printf("  --replay             load the saved brain and replay it in a window (default)\n");
+  printf("  --no-render          run training without opening an SDL window\n");
+  printf("  --generations <n>    total generations to train\n");
   printf("  --brain <path>       brain file to load/save (default: out/best.brain)\n");
   printf("  --strategy <name>    choose v1, v2, v3, v4, adaptive, or adaptive-conservative\n");
   printf("  --seed <value>       use a fixed random seed for reproducible runs\n");
 }
 
 AppConfigParseResult app_config_parse(int argc, char* argv[], AppConfig* config) {
-  config->replay_only = false;
+  config->replay_only = true;
   config->no_render = false;
   config->generations = DEFAULT_GENERATIONS;
   config->brain_path = DEFAULT_BRAIN_PATH;

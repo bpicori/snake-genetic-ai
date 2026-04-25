@@ -16,7 +16,6 @@ typedef struct {
 bool training_session_init(TrainingSession* session, const AppConfig* config);
 Agent* training_session_best_agent(TrainingSession* session);
 Agent* training_session_train_generations(TrainingSession* session, int count, const AppConfig* config);
-Agent* training_session_train_after_game_over(TrainingSession* session, const AppConfig* config);
 int training_run_headless(const AppConfig* config);
 
 #endif

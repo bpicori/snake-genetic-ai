@@ -68,11 +68,6 @@ Agent* training_session_train_generations(TrainingSession* session, int count, c
   return session->best_agent;
 }
 
-Agent* training_session_train_after_game_over(TrainingSession* session, const AppConfig* config) {
-  population_next_generation(&session->population, config->strategy);
-  return training_session_train_generations(session, config->generations, config);
-}
-
 int training_run_headless(const AppConfig* config) {
   if (config->replay_only) {
     fprintf(stderr, "--no-render is for training; use replay without --no-render.\n");
