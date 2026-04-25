@@ -89,6 +89,8 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   inputs[8] = game->food.y > head.y ? 1.0f : 0.0f;
   inputs[9] = game->food.x < head.x ? 1.0f : 0.0f;
   inputs[10] = game->food.x > head.x ? 1.0f : 0.0f;
+  inputs[11] = (float)(game->food.x - head.x) / GRID_WIDTH;
+  inputs[12] = (float)(game->food.y - head.y) / GRID_HEIGHT;
 }
 
 /*

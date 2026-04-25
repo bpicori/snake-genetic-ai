@@ -89,6 +89,8 @@ void population_init(Population* population) {
   population->generation = 0;
   population->best_agent_index = 0;
   population->best_fitness = 0.0f;
+  population->best_fitness_ever = 0.0f;
+  population->stagnant_generations = 0;
   population->mutation_rate = MUTATION_RATE;
   population->mutation_strength = MUTATION_STRENGTH;
 

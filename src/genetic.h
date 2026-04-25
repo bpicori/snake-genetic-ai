@@ -4,10 +4,10 @@
 #include "agent.h"
 
 #define POPULATION_SIZE 100
-#define MAX_GAME_STEPS 500
+#define MAX_GAME_STEPS 700
 #define MUTATION_RATE 0.05f
 #define MUTATION_STRENGTH 0.2f
-#define MAX_STEPS_WITHOUT_FOOD 100
+#define MAX_STEPS_WITHOUT_FOOD 200
 #define ELITE_COUNT 5        // top 5 agents survive to the next generation
 #define PARENT_POOL_SIZE 20  // 20 agents are selected to be parents for the next generation
 #define EVALUATION_GAMES 3   // each agent is evaluated 3 times

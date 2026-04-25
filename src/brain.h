@@ -26,6 +26,8 @@
  *   8: food is below
  *   9: food is left
  *  10: food is right
+ *  11: normalized food dx
+ *  12: normalized food dy
  *
  * The network outputs 3 scores:
  *   0: turn left
@@ -34,8 +36,8 @@
  *
  * The highest-scoring output becomes the chosen action.
  */
-#define BRAIN_INPUTS 11
-#define BRAIN_HIDDEN 16
+#define BRAIN_INPUTS 13
+#define BRAIN_HIDDEN 32
 #define BRAIN_OUTPUTS 3
 
 typedef struct {

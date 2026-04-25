@@ -27,5 +27,5 @@ void agent_set_result(Agent* agent, const Game* game) {
    * This makes the snake that ate food rank higher, even if another snake
    * survived longer without eating.
    */
-  agent->fitness = (float)((game->score * 1000) + game->steps + (game->distance_reward * 5));
+  agent->fitness = (float)((game->score * game->score * 1000) + game->steps + (game->distance_reward * 5));
 }
