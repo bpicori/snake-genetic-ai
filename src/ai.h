@@ -3,6 +3,6 @@
 
 #include "game.h"
 
-Direction choose_direction_toward_food(const Game *game);
+Direction choose_direction_toward_food(const Game* game);
 
 #endif

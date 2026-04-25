@@ -1,10 +1,10 @@
-#include "SDL_keycode.h"
-#include "SDL_render.h"
-#include "SDL_video.h"
 #include <SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "SDL_keycode.h"
+#include "SDL_render.h"
+#include "SDL_video.h"
 #include "agent.h"
 #include "game.h"
 #include "genetic.h"
@@ -27,19 +27,16 @@
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
 
-static bool init_sdl(SDL_Window **window, SDL_Renderer **renderer) {
+static bool init_sdl(SDL_Window** window, SDL_Renderer** renderer) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
     return false;
   }
 
-  *window = SDL_CreateWindow("Snake AI", SDL_WINDOWPOS_CENTERED,
-                             SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
-                             WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
+  *window = SDL_CreateWindow("Snake AI", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
 
   if (*window == NULL) {
-    fprintf(stderr, "Window could not be created! SDL_Error: %s\n",
-            SDL_GetError());
+    fprintf(stderr, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
     SDL_Quit();
     return false;
   }
@@ -47,8 +44,7 @@ static bool init_sdl(SDL_Window **window, SDL_Renderer **renderer) {
   *renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED);
 
   if (*renderer == NULL) {
-    fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n",
-            SDL_GetError());
+    fprintf(stderr, "Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
     SDL_DestroyWindow(*window);
     SDL_Quit();
     return false;
@@ -57,13 +53,13 @@ static bool init_sdl(SDL_Window **window, SDL_Renderer **renderer) {
   return true;
 }
 
-static void cleanup_sdl(SDL_Window *window, SDL_Renderer *renderer) {
+static void cleanup_sdl(SDL_Window* window, SDL_Renderer* renderer) {
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
 }
 
-static void handle_input(bool *running, Game *game) {
+static void handle_input(bool* running, Game* game) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -73,45 +69,45 @@ static void handle_input(bool *running, Game *game) {
 
     if (event.type == SDL_KEYDOWN) {
       switch (event.key.keysym.sym) {
-      case SDLK_UP:
-        game_set_direction(game, UP);
-        break;
-      case SDLK_DOWN:
-        game_set_direction(game, DOWN);
-        break;
-      case SDLK_LEFT:
-        game_set_direction(game, LEFT);
-        break;
-      case SDLK_RIGHT:
-        game_set_direction(game, RIGHT);
-        break;
-      case SDLK_ESCAPE:
-        *running = false;
-        break;
-      case SDLK_SPACE:
-        ai_enabled = !ai_enabled;
-        break;
-      case SDLK_r:
-        game_init(game);
-        break;
+        case SDLK_UP:
+          game_set_direction(game, UP);
+          break;
+        case SDLK_DOWN:
+          game_set_direction(game, DOWN);
+          break;
+        case SDLK_LEFT:
+          game_set_direction(game, LEFT);
+          break;
+        case SDLK_RIGHT:
+          game_set_direction(game, RIGHT);
+          break;
+        case SDLK_ESCAPE:
+          *running = false;
+          break;
+        case SDLK_SPACE:
+          ai_enabled = !ai_enabled;
+          break;
+        case SDLK_r:
+          game_init(game);
+          break;
       }
     }
   }
 }
 
-static Agent *train_generations(Population *population, int count) {
-  Agent *best_agent = NULL;
+static Agent* train_generations(Population* population, int count) {
+  Agent* best_agent = NULL;
 
   for (int i = 0; i < count; i++) {
     population_evaluate(population);
 
     best_agent = &population->agents[population->best_agent_index];
 
-    printf("Generation %d | fitness %.2f | score %d | steps %d | distance %d | "
-           "mutation %.3f %.3f\n",
-           population->generation, best_agent->fitness, best_agent->score,
-           best_agent->steps, best_agent->distance_reward,
-           population->mutation_rate, population->mutation_strength);
+    printf(
+        "Generation %d | fitness %.2f | score %d | steps %d | distance %d | "
+        "mutation %.3f %.3f\n",
+        population->generation, best_agent->fitness, best_agent->score, best_agent->steps, best_agent->distance_reward,
+        population->mutation_rate, population->mutation_strength);
 
     if (best_agent->fitness > best_fitness_ever) {
       best_fitness_ever = best_agent->fitness;
@@ -131,8 +127,7 @@ static Agent *train_generations(Population *population, int count) {
   return best_agent;
 }
 
-static bool setup_best_agent(Population *population, Agent *saved_agent,
-                             Agent **best_agent) {
+static bool setup_best_agent(Population* population, Agent* saved_agent, Agent** best_agent) {
   if (REPLAY_ONLY) {
     if (!brain_load(&saved_agent->brain, BEST_BRAIN_PATH)) {
       printf("No saved brain found at %s\n", BEST_BRAIN_PATH);
@@ -156,8 +151,7 @@ static bool setup_best_agent(Population *population, Agent *saved_agent,
   return true;
 }
 
-static void update_simulation(Game *game, Agent **best_agent,
-                              Population *population) {
+static void update_simulation(Game* game, Agent** best_agent, Population* population) {
   if (ai_enabled) {
     Direction direction = agent_choose_direction(*best_agent, game);
     game_set_direction(game, direction);
@@ -165,8 +159,7 @@ static void update_simulation(Game *game, Agent **best_agent,
 
   game_update(game);
 
-  if (!game->alive || game->steps >= MAX_GAME_STEPS ||
-      game->steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
+  if (!game->alive || game->steps >= MAX_GAME_STEPS || game->steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
     if (REPLAY_ONLY) {
       game_init(game);
     } else {
@@ -177,7 +170,7 @@ static void update_simulation(Game *game, Agent **best_agent,
   }
 }
 
-static void update_window_title(SDL_Window *window, const Game *game) {
+static void update_window_title(SDL_Window* window, const Game* game) {
   char title[128];
 
   snprintf(title, sizeof(title), "Snake AI | Score: %d", game->score);
@@ -186,8 +179,8 @@ static void update_window_title(SDL_Window *window, const Game *game) {
 }
 
 int main(void) {
-  SDL_Window *window = NULL;
-  SDL_Renderer *renderer = NULL;
+  SDL_Window* window = NULL;
+  SDL_Renderer* renderer = NULL;
   if (!init_sdl(&window, &renderer)) {
     return 1;
   }
@@ -201,7 +194,7 @@ int main(void) {
   population_init(&population);
 
   Agent saved_agent = {0};
-  Agent *best_agent = NULL;
+  Agent* best_agent = NULL;
   if (!setup_best_agent(&population, &saved_agent, &best_agent)) {
     cleanup_sdl(window, renderer);
     return 1;

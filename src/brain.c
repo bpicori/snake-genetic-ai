@@ -1,4 +1,5 @@
 #include "brain.h"
+
 #include <math.h>
 #include <stdlib.h>
 
@@ -6,29 +7,25 @@
 static bool random_bool(void) { return rand() % 2 == 0; }
 
 // Creates a random neural-network weight between -1.0 and 1.0.
-static float random_weight(void) {
-  return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
-}
+static float random_weight(void) { return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f; }
 
 // Returns a random float between 0.0 and 1.0.
 static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
 
 // Creates a small random change between -mutation_strength and
 // +mutation_strength.
-static float random_mutation(float mutation_strength) {
-  return (random_float() * 2.0f - 1.0f) * mutation_strength;
-}
+static float random_mutation(float mutation_strength) { return (random_float() * 2.0f - 1.0f) * mutation_strength; }
 // Converts the current direction into the direction produced by turning left.
 static Direction turn_left(Direction direction) {
   switch (direction) {
-  case UP:
-    return LEFT;
-  case LEFT:
-    return DOWN;
-  case DOWN:
-    return RIGHT;
-  case RIGHT:
-    return UP;
+    case UP:
+      return LEFT;
+    case LEFT:
+      return DOWN;
+    case DOWN:
+      return RIGHT;
+    case RIGHT:
+      return UP;
   }
   return direction;
 }
@@ -36,14 +33,14 @@ static Direction turn_left(Direction direction) {
 // Converts the current direction into the direction produced by turning right.
 static Direction turn_right(Direction direction) {
   switch (direction) {
-  case UP:
-    return RIGHT;
-  case RIGHT:
-    return DOWN;
-  case DOWN:
-    return LEFT;
-  case LEFT:
-    return UP;
+    case UP:
+      return RIGHT;
+    case RIGHT:
+      return DOWN;
+    case DOWN:
+      return LEFT;
+    case LEFT:
+      return UP;
   }
   return direction;
 }
@@ -73,7 +70,7 @@ static Direction direction_from_action(Direction current, int action) {
  * The inputs describe nearby danger, current movement direction, and where the
  * food is relative to the snake head.
  */
-static void build_inputs(const Game *game, float inputs[BRAIN_INPUTS]) {
+static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   Direction current = game->snake.direction;
   Vec2 head = game->snake.body[0];
 
@@ -111,8 +108,7 @@ static void build_inputs(const Game *game, float inputs[BRAIN_INPUTS]) {
  *
  * If it is not selected, it stays 0.70.
  */
-static float mutate_value(float value, float mutation_rate,
-                          float mutation_strength) {
+static float mutate_value(float value, float mutation_rate, float mutation_strength) {
   if (random_float() < mutation_rate) {
     value += random_mutation(mutation_strength);
   }
@@ -126,7 +122,7 @@ static float mutate_value(float value, float mutation_rate,
  * This is used when creating the first generation of agents before any
  * evolution has happened.
  */
-void brain_randomize(Brain *brain) {
+void brain_randomize(Brain* brain) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
       brain->w1[i][j] = random_weight();
@@ -158,7 +154,7 @@ void brain_randomize(Brain *brain) {
  *   4. Pick the highest-scoring output.
  *   5. Convert that output into left, straight, or right movement.
  */
-Direction brain_choose_direction(const Brain *brain, const Game *game) {
+Direction brain_choose_direction(const Brain* brain, const Game* game) {
   float inputs[BRAIN_INPUTS];
   float hidden[BRAIN_HIDDEN];
   float outputs[BRAIN_OUTPUTS];
@@ -201,7 +197,7 @@ Direction brain_choose_direction(const Brain *brain, const Game *game) {
  *
  * Used when an agent survives unchanged or when creating a child from a parent.
  */
-void brain_copy(Brain *dest, const Brain *src) {
+void brain_copy(Brain* dest, const Brain* src) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
       dest->w1[i][j] = src->w1[i][j];
@@ -228,11 +224,10 @@ void brain_copy(Brain *dest, const Brain *src) {
  * Most values stay unchanged. A few values are nudged slightly, which creates
  * variation between generations.
  */
-void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
+void brain_mutate(Brain* brain, float mutation_rate, float mutation_strength) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
-      brain->w1[i][j] =
-          mutate_value(brain->w1[i][j], mutation_rate, mutation_strength);
+      brain->w1[i][j] = mutate_value(brain->w1[i][j], mutation_rate, mutation_strength);
     }
   }
 
@@ -242,8 +237,7 @@ void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
 
   for (int i = 0; i < BRAIN_HIDDEN; i++) {
     for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-      brain->w2[i][j] =
-          mutate_value(brain->w2[i][j], mutation_rate, mutation_strength);
+      brain->w2[i][j] = mutate_value(brain->w2[i][j], mutation_rate, mutation_strength);
     }
   }
 
@@ -258,8 +252,7 @@ void brain_mutate(Brain *brain, float mutation_rate, float mutation_strength) {
  * For every weight and bias, the child randomly inherits the value from either
  * parent A or parent B. Mutation can be applied afterward.
  */
-void brain_crossover(Brain *child, const Brain *parent_a,
-                     const Brain *parent_b) {
+void brain_crossover(Brain* child, const Brain* parent_a, const Brain* parent_b) {
   for (int i = 0; i < BRAIN_INPUTS; i++) {
     for (int j = 0; j < BRAIN_HIDDEN; j++) {
       child->w1[i][j] = random_bool() ? parent_a->w1[i][j] : parent_b->w1[i][j];
@@ -286,8 +279,8 @@ void brain_crossover(Brain *child, const Brain *parent_a,
  *
  * This lets us keep the best trained brain after the program exits.
  */
-bool brain_save(const Brain *brain, const char *path) {
-  FILE *file = fopen(path, "wb");
+bool brain_save(const Brain* brain, const char* path) {
+  FILE* file = fopen(path, "wb");
 
   if (file == NULL) {
     return false;
@@ -304,8 +297,8 @@ bool brain_save(const Brain *brain, const char *path) {
  *
  * Returns false if the file does not exist or cannot be read.
  */
-bool brain_load(Brain *brain, const char *path) {
-  FILE *file = fopen(path, "rb");
+bool brain_load(Brain* brain, const char* path) {
+  FILE* file = fopen(path, "rb");
 
   if (file == NULL) {
     return false;

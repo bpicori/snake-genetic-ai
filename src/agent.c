@@ -1,6 +1,6 @@
 #include "agent.h"
 
-void agent_randomize(Agent *agent) {
+void agent_randomize(Agent* agent) {
   brain_randomize(&agent->brain);
   agent->fitness = 0.0f;
   agent->score = 0;
@@ -8,11 +8,9 @@ void agent_randomize(Agent *agent) {
   agent->distance_reward = 0;
 }
 
-Direction agent_choose_direction(const Agent *agent, const Game *game) {
-  return brain_choose_direction(&agent->brain, game);
-}
+Direction agent_choose_direction(const Agent* agent, const Game* game) { return brain_choose_direction(&agent->brain, game); }
 
-void agent_set_result(Agent *agent, const Game *game) {
+void agent_set_result(Agent* agent, const Game* game) {
   agent->score = game->score;
   agent->steps = game->steps;
   agent->distance_reward = game->distance_reward;

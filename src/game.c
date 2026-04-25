@@ -1,9 +1,10 @@
 #include "game.h"
+
 #include <stdlib.h>
 
 static bool vec2_equals(Vec2 a, Vec2 b) { return a.x == b.x && a.y == b.y; }
 
-static bool snake_contains_position(Snake *snake, Vec2 position) {
+static bool snake_contains_position(Snake* snake, Vec2 position) {
   for (int i = 0; i < snake->length; i++) {
     if (vec2_equals(snake->body[i], position)) {
       return true;
@@ -12,7 +13,7 @@ static bool snake_contains_position(Snake *snake, Vec2 position) {
   return false;
 }
 
-static void spawn_food(Game *game) {
+static void spawn_food(Game* game) {
   Vec2 position;
   do {
     position = (Vec2){rand() % GRID_WIDTH, rand() % GRID_HEIGHT};
@@ -21,45 +22,42 @@ static void spawn_food(Game *game) {
   game->food = position;
 }
 
-static Vec2 next_head_for_direction(const Game *game, Direction direction) {
+static Vec2 next_head_for_direction(const Game* game, Direction direction) {
   Vec2 head = game->snake.body[0];
   switch (direction) {
-  case UP:
-    head.y -= 1;
-    break;
-  case DOWN:
-    head.y += 1;
-    break;
-  case LEFT:
-    head.x -= 1;
-    break;
-  case RIGHT:
-    head.x += 1;
-    break;
+    case UP:
+      head.y -= 1;
+      break;
+    case DOWN:
+      head.y += 1;
+      break;
+    case LEFT:
+      head.x -= 1;
+      break;
+    case RIGHT:
+      head.x += 1;
+      break;
   }
   return head;
 }
 
 // Manhattan distance to the food
-static int distance_to_food(const Game *game, Vec2 position) {
+static int distance_to_food(const Game* game, Vec2 position) {
   int dx = game->food.x - position.x;
   int dy = game->food.y - position.y;
 
-  if (dx < 0)
-    dx = -dx;
-  if (dy < 0)
-    dy = -dy;
+  if (dx < 0) dx = -dx;
+  if (dy < 0) dy = -dy;
 
   return dx + dy;
 }
 
-bool game_is_direction_safe(const Game *game, Direction direction) {
+bool game_is_direction_safe(const Game* game, Direction direction) {
   Vec2 next_head = next_head_for_direction(game, direction);
-  if (next_head.x < 0 || next_head.x >= GRID_WIDTH || next_head.y < 0 ||
-      next_head.y >= GRID_HEIGHT) {
+  if (next_head.x < 0 || next_head.x >= GRID_WIDTH || next_head.y < 0 || next_head.y >= GRID_HEIGHT) {
     return false;
   }
-  const Snake *snake = &game->snake;
+  const Snake* snake = &game->snake;
   for (int i = 1; i < snake->length; i++) {
     if (snake->body[i].x == next_head.x && snake->body[i].y == next_head.y) {
       return false;
@@ -68,7 +66,7 @@ bool game_is_direction_safe(const Game *game, Direction direction) {
   return true;
 }
 
-void game_init(Game *game) {
+void game_init(Game* game) {
   game->snake.length = 1;
   game->snake.body[0] = (Vec2){5, 5};
   game->snake.direction = RIGHT;
@@ -88,35 +86,34 @@ void game_init(Game *game) {
 // 4. commit movement
 // 5. increment steps
 // 6. handle eating/growth
-void game_update(Game *game) {
+void game_update(Game* game) {
   if (!game->alive) {
     return;
   }
 
-  Snake *snake = &game->snake;
+  Snake* snake = &game->snake;
   Vec2 old_tail = snake->body[snake->length - 1];
   Vec2 new_head = snake->body[0];
   int old_distance = distance_to_food(game, new_head);
 
   // update the snake's head position based on its direction
   switch (snake->direction) {
-  case UP:
-    new_head.y -= 1;
-    break;
-  case DOWN:
-    new_head.y += 1;
-    break;
-  case LEFT:
-    new_head.x -= 1;
-    break;
-  case RIGHT:
-    new_head.x += 1;
-    break;
+    case UP:
+      new_head.y -= 1;
+      break;
+    case DOWN:
+      new_head.y += 1;
+      break;
+    case LEFT:
+      new_head.x -= 1;
+      break;
+    case RIGHT:
+      new_head.x += 1;
+      break;
   }
 
   // check if the snake has hit the wall
-  if (new_head.x < 0 || new_head.x >= GRID_WIDTH || new_head.y < 0 ||
-      new_head.y >= GRID_HEIGHT) {
+  if (new_head.x < 0 || new_head.x >= GRID_WIDTH || new_head.y < 0 || new_head.y >= GRID_HEIGHT) {
     game->alive = false;
     return;
   }
@@ -158,7 +155,7 @@ void game_update(Game *game) {
   }
 }
 
-void game_set_direction(Game *game, Direction direction) {
+void game_set_direction(Game* game, Direction direction) {
   Direction current = game->snake.direction;
 
   if (current == UP && direction == DOWN) {

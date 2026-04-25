@@ -1,7 +1,8 @@
+#include "genetic.h"
+
 #include <stdlib.h>
 
 #include "brain.h"
-#include "genetic.h"
 
 /*
  Clamps a float value between a minimum and maximum value.
@@ -64,35 +65,27 @@ static void sort_agents_by_fitness(Agent agents[], int count) {
  * clamp_float keeps mutation inside safe min/max limits, so it never becomes
  * too small to explore or too large to preserve useful behavior.
  */
-static void update_adaptive_mutation(Population *population) {
+static void update_adaptive_mutation(Population* population) {
   // found a new best fitness
   if (population->best_fitness > population->best_fitness_ever) {
     population->best_fitness_ever = population->best_fitness;
     population->stagnant_generations = 0;
     // reduce mutation rate and strength by 5% (0.95 means reduce by 5%)
-    population->mutation_rate =
-        clamp_float(population->mutation_rate * 0.95f, MIN_MUTATION_RATE,
-                    MAX_MUTATION_RATE);
-    population->mutation_strength =
-        clamp_float(population->mutation_strength * 0.95f,
-                    MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
+    population->mutation_rate = clamp_float(population->mutation_rate * 0.95f, MIN_MUTATION_RATE, MAX_MUTATION_RATE);
+    population->mutation_strength = clamp_float(population->mutation_strength * 0.95f, MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
   } else {
     population->stagnant_generations++;
     // if no improvement for STAGNATION_THRESHOLD generations, increase mutation
     // rate and strength by 25% (1.25 means increase by 25%)
     if (population->stagnant_generations >= STAGNATION_THRESHOLD) {
-      population->mutation_rate =
-          clamp_float(population->mutation_rate * 1.25f, MIN_MUTATION_RATE,
-                      MAX_MUTATION_RATE);
-      population->mutation_strength =
-          clamp_float(population->mutation_strength * 1.25f,
-                      MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
+      population->mutation_rate = clamp_float(population->mutation_rate * 1.25f, MIN_MUTATION_RATE, MAX_MUTATION_RATE);
+      population->mutation_strength = clamp_float(population->mutation_strength * 1.25f, MIN_MUTATION_STRENGTH, MAX_MUTATION_STRENGTH);
       population->stagnant_generations = 0;
     }
   }
 }
 
-void population_init(Population *population) {
+void population_init(Population* population) {
   population->generation = 0;
   population->best_agent_index = 0;
   population->best_fitness = 0.0f;
@@ -125,7 +118,7 @@ void population_init(Population *population) {
  * This function does not create the next generation yet. It only measures how
  * good the current generation is.
  */
-void population_evaluate(Population *population) {
+void population_evaluate(Population* population) {
   population->best_agent_index = 0;
   population->best_fitness = 0.0f;
 
@@ -139,10 +132,8 @@ void population_evaluate(Population *population) {
       Game game;
       game_init(&game);
 
-      while (game.alive && game.steps < MAX_GAME_STEPS &&
-             game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
-        Direction direction =
-            agent_choose_direction(&population->agents[i], &game);
+      while (game.alive && game.steps < MAX_GAME_STEPS && game.steps_since_food < MAX_STEPS_WITHOUT_FOOD) {
+        Direction direction = agent_choose_direction(&population->agents[i], &game);
         game_set_direction(&game, direction);
         game_update(&game);
       }
@@ -151,20 +142,16 @@ void population_evaluate(Population *population) {
       total_fitness += population->agents[i].fitness;
       total_distance_reward += game.distance_reward;
 
-      if (game.score > best_score ||
-          (game.score == best_score && game.steps > best_steps)) {
+      if (game.score > best_score || (game.score == best_score && game.steps > best_steps)) {
         best_score = game.score;
         best_steps = game.steps;
       }
     }
 
-    population->agents[i].fitness =
-        total_fitness /
-        EVALUATION_GAMES; // average fitness over all evaluation games
+    population->agents[i].fitness = total_fitness / EVALUATION_GAMES;  // average fitness over all evaluation games
     population->agents[i].score = best_score;
     population->agents[i].steps = best_steps;
-    population->agents[i].distance_reward =
-        total_distance_reward / EVALUATION_GAMES;
+    population->agents[i].distance_reward = total_distance_reward / EVALUATION_GAMES;
 
     if (population->agents[i].fitness > population->best_fitness) {
       population->best_fitness = population->agents[i].fitness;
@@ -191,7 +178,7 @@ void population_evaluate(Population *population) {
  * The top 20 agents are a parent pool. They are not all copied directly;
  * they are candidates for producing the rest of the population.
  */
-void population_next_generation_v2_elite_parent_pool(Population *population) {
+void population_next_generation_v2_elite_parent_pool(Population* population) {
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
   Agent next_agents[POPULATION_SIZE];
@@ -228,15 +215,14 @@ void population_next_generation_v2_elite_parent_pool(Population *population) {
  * generation. The rest of the population is created by copying the best agent's
  * brain and mutating it.
  */
-void population_next_generation_v1_best_only(Population *population) {
+void population_next_generation_v1_best_only(Population* population) {
   Agent best_agent = population->agents[population->best_agent_index];
 
   population->agents[0] = best_agent;
 
   for (int i = 1; i < POPULATION_SIZE; i++) {
     brain_copy(&population->agents[i].brain, &best_agent.brain);
-    brain_mutate(&population->agents[i].brain, MUTATION_RATE,
-                 MUTATION_STRENGTH);
+    brain_mutate(&population->agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
 
     population->agents[i].fitness = 0.0f;
     population->agents[i].score = 0;
@@ -265,7 +251,7 @@ void population_next_generation_v1_best_only(Population *population) {
  * Crossover means each brain weight/bias is copied from either parent A or
  * parent B. Mutation then makes small random changes to the mixed brain.
  */
-void population_next_generation_v3_crossover(Population *population) {
+void population_next_generation_v3_crossover(Population* population) {
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
   Agent next_agents[POPULATION_SIZE];
@@ -282,9 +268,7 @@ void population_next_generation_v3_crossover(Population *population) {
     next_agents[i].score = 0;
     next_agents[i].steps = 0;
 
-    brain_crossover(&next_agents[i].brain,
-                    &population->agents[parent_a_index].brain,
-                    &population->agents[parent_b_index].brain);
+    brain_crossover(&next_agents[i].brain, &population->agents[parent_a_index].brain, &population->agents[parent_b_index].brain);
 
     brain_mutate(&next_agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
   }
@@ -299,7 +283,7 @@ void population_next_generation_v3_crossover(Population *population) {
   population->generation++;
 }
 
-void population_next_generation_v5_adaptive_mutation(Population *population) {
+void population_next_generation_v5_adaptive_mutation(Population* population) {
   update_adaptive_mutation(population);
 
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
@@ -319,12 +303,9 @@ void population_next_generation_v5_adaptive_mutation(Population *population) {
     next_agents[i].steps = 0;
     next_agents[i].distance_reward = 0;
 
-    brain_crossover(&next_agents[i].brain,
-                    &population->agents[parent_a_index].brain,
-                    &population->agents[parent_b_index].brain);
+    brain_crossover(&next_agents[i].brain, &population->agents[parent_a_index].brain, &population->agents[parent_b_index].brain);
 
-    brain_mutate(&next_agents[i].brain, population->mutation_rate,
-                 population->mutation_strength);
+    brain_mutate(&next_agents[i].brain, population->mutation_rate, population->mutation_strength);
   }
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
@@ -336,6 +317,4 @@ void population_next_generation_v5_adaptive_mutation(Population *population) {
   population->generation++;
 }
 
-void population_next_generation(Population *population) {
-  population_next_generation_v5_adaptive_mutation(population);
-}
+void population_next_generation(Population* population) { population_next_generation_v5_adaptive_mutation(population); }

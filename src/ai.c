@@ -1,7 +1,8 @@
 #include "ai.h"
+
 #include "game.h"
 
-Direction choose_direction_toward_food(const Game *game) {
+Direction choose_direction_toward_food(const Game* game) {
   Vec2 head = game->snake.body[0];
 
   Direction preferred[6];

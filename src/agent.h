@@ -12,8 +12,8 @@ typedef struct {
   int distance_reward;
 } Agent;
 
-void agent_randomize(Agent *agent);
-Direction agent_choose_direction(const Agent *agent, const Game *game);
-void agent_set_result(Agent *agent, const Game *game);
+void agent_randomize(Agent* agent);
+Direction agent_choose_direction(const Agent* agent, const Game* game);
+void agent_set_result(Agent* agent, const Game* game);
 
 #endif
