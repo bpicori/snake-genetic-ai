@@ -505,25 +505,40 @@ If score plateaus around a value like 40, likely causes are:
 
 This is normal in genetic algorithms. Plateaus are part of the search process.
 
-## 24. Next Improvements
+## 24. Current Optimizations
 
-Good next experiments:
+Implemented optimization experiments:
 
-- initialize all adaptive mutation fields carefully
-- add normalized food distance inputs
-- increase hidden neurons from 16 to 24 or 32
-- increase `MAX_GAME_STEPS`
-- increase `MAX_STEPS_WITHOUT_FOOD`
-- try squared score reward: `score * score * 1000`
-- add command-line flags for training vs replay
-- compare V1, V2, V3, and adaptive mutation with logs
-
-The most promising next improvement is adding normalized food distance inputs:
+- adaptive mutation fields are initialized during population setup
+- normalized food distance inputs were added:
 
 ```text
 food_dx = (food.x - head.x) / GRID_WIDTH
 food_dy = (food.y - head.y) / GRID_HEIGHT
 ```
 
-The current brain knows the direction of food, but not how far away it is. More
-precise inputs may help it make better decisions.
+- hidden neurons were increased from 16 to 32
+- `MAX_GAME_STEPS` and `MAX_STEPS_WITHOUT_FOOD` were increased
+- fitness now uses squared score reward: `score * score * 1000`
+- command-line flags select training, replay, and genetic strategy
+- logs include strategy name, best fitness, average fitness, score, steps,
+  distance reward, and mutation settings
+
+Useful commands:
+
+```text
+./out/snake-ai --train
+./out/snake-ai --replay
+./out/snake-ai --train --strategy v1
+./out/snake-ai --train --strategy v2
+./out/snake-ai --train --strategy v3
+./out/snake-ai --train --strategy v4
+./out/snake-ai --train --strategy adaptive
+```
+
+Good next experiments:
+
+- compare V1, V2, V3, V4, and adaptive mutation over the same number of
+  generations
+- try parallel population evaluation after the strategy comparison is stable
+- save comparison logs to a CSV file for easier analysis

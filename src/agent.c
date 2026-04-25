@@ -17,12 +17,12 @@ void agent_set_result(Agent* agent, const Game* game) {
 
   /*
    * Fitness is the score used by the genetic algorithm to rank agents.
-   * Eating food is much more valuable than only surviving, so each food
-   * point is weighted heavily.
+   * Eating food is much more valuable than only surviving. Squaring the score
+   * makes higher-scoring snakes stand out strongly during selection.
    *
    * Example:
-   *   score = 3, steps = 120 -> fitness = 3 * 1000 + 120 = 3120
-   *   score = 0, steps = 300 -> fitness = 0 * 1000 + 300 = 300
+   *   score = 3, steps = 120 -> fitness = 3 * 3 * 1000 + 120 = 9120
+   *   score = 0, steps = 300 -> fitness = 0 * 0 * 1000 + 300 = 300
    *
    * This makes the snake that ate food rank higher, even if another snake
    * survived longer without eating.

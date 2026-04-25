@@ -6,8 +6,9 @@
 /*
  * Neural network input layout.
  *
- * The brain receives a compact snapshot of the current game state as 11 float
- * values. Each value is either 0.0f or 1.0f.
+ * The brain receives a compact snapshot of the current game state as 13 float
+ * values. Most values are booleans represented as 0.0f or 1.0f; the final two
+ * values are normalized food distances.
  *
  * Inputs 0-2 describe immediate danger relative to the snake's current
  * direction:

@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "SDL_keycode.h"
 #include "SDL_render.h"
@@ -22,10 +23,49 @@
 
 #define BEST_BRAIN_PATH "out/best.brain"
 
-#define REPLAY_ONLY false
-
 bool ai_enabled = true;
 static float best_fitness_ever = 0.0f;
+
+typedef struct {
+  bool replay_only;
+  PopulationStrategy strategy;
+} AppConfig;
+
+static void print_usage(const char* program_name) {
+  printf("Usage: %s [--train|--replay] [--strategy v1|v2|v3|v4|adaptive]\n", program_name);
+  printf("  --train              train and periodically replay the best brain (default)\n");
+  printf("  --replay             load out/best.brain and replay without training\n");
+  printf("  --strategy <name>    choose v1, v2, v3, v4, or adaptive\n");
+}
+
+static bool parse_args(int argc, char* argv[], AppConfig* config) {
+  config->replay_only = false;
+  config->strategy = POPULATION_STRATEGY_ADAPTIVE_MUTATION;
+
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--train") == 0) {
+      config->replay_only = false;
+    } else if (strcmp(argv[i], "--replay") == 0) {
+      config->replay_only = true;
+    } else if (strcmp(argv[i], "--strategy") == 0) {
+      if (i + 1 >= argc || !population_strategy_from_name(argv[i + 1], &config->strategy)) {
+        fprintf(stderr, "Invalid or missing strategy.\n");
+        print_usage(argv[0]);
+        return false;
+      }
+      i++;
+    } else if (strcmp(argv[i], "--help") == 0) {
+      print_usage(argv[0]);
+      return false;
+    } else {
+      fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+      print_usage(argv[0]);
+      return false;
+    }
+  }
+
+  return true;
+}
 
 static bool init_sdl(SDL_Window** window, SDL_Renderer** renderer) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -95,7 +135,7 @@ static void handle_input(bool* running, Game* game) {
   }
 }
 
-static Agent* train_generations(Population* population, int count) {
+static Agent* train_generations(Population* population, int count, PopulationStrategy strategy) {
   Agent* best_agent = NULL;
 
   for (int i = 0; i < count; i++) {
@@ -104,10 +144,10 @@ static Agent* train_generations(Population* population, int count) {
     best_agent = &population->agents[population->best_agent_index];
 
     printf(
-        "Generation %d | fitness %.2f | score %d | steps %d | distance %d | "
+        "Strategy %s | generation %d | best %.2f | average %.2f | score %d | steps %d | distance %d | "
         "mutation %.3f %.3f\n",
-        population->generation, best_agent->fitness, best_agent->score, best_agent->steps, best_agent->distance_reward,
-        population->mutation_rate, population->mutation_strength);
+        population_strategy_name(strategy), population->generation, best_agent->fitness, population->average_fitness, best_agent->score,
+        best_agent->steps, best_agent->distance_reward, population->mutation_rate, population->mutation_strength);
 
     if (best_agent->fitness > best_fitness_ever) {
       best_fitness_ever = best_agent->fitness;
@@ -118,7 +158,7 @@ static Agent* train_generations(Population* population, int count) {
       }
     }
 
-    population_next_generation(population);
+    population_next_generation(population, strategy);
   }
 
   population_evaluate(population);
@@ -127,8 +167,8 @@ static Agent* train_generations(Population* population, int count) {
   return best_agent;
 }
 
-static bool setup_best_agent(Population* population, Agent* saved_agent, Agent** best_agent) {
-  if (REPLAY_ONLY) {
+static bool setup_best_agent(Population* population, Agent* saved_agent, Agent** best_agent, const AppConfig* config) {
+  if (config->replay_only) {
     if (!brain_load(&saved_agent->brain, BEST_BRAIN_PATH)) {
       printf("No saved brain found at %s\n", BEST_BRAIN_PATH);
       return false;
@@ -147,11 +187,11 @@ static bool setup_best_agent(Population* population, Agent* saved_agent, Agent**
     printf("Best brain loaded from %s\n", BEST_BRAIN_PATH);
   }
 
-  *best_agent = train_generations(population, GENERATIONS_PER_REPLAY);
+  *best_agent = train_generations(population, GENERATIONS_PER_REPLAY, config->strategy);
   return true;
 }
 
-static void update_simulation(Game* game, Agent** best_agent, Population* population) {
+static void update_simulation(Game* game, Agent** best_agent, Population* population, const AppConfig* config) {
   if (ai_enabled) {
     Direction direction = agent_choose_direction(*best_agent, game);
     game_set_direction(game, direction);
@@ -160,11 +200,11 @@ static void update_simulation(Game* game, Agent** best_agent, Population* popula
   game_update(game);
 
   if (!game->alive || game->steps >= MAX_GAME_STEPS || game->steps_since_food >= MAX_STEPS_WITHOUT_FOOD) {
-    if (REPLAY_ONLY) {
+    if (config->replay_only) {
       game_init(game);
     } else {
-      population_next_generation(population);
-      *best_agent = train_generations(population, GENERATIONS_PER_REPLAY);
+      population_next_generation(population, config->strategy);
+      *best_agent = train_generations(population, GENERATIONS_PER_REPLAY, config->strategy);
       game_init(game);
     }
   }
@@ -178,7 +218,21 @@ static void update_window_title(SDL_Window* window, const Game* game) {
   SDL_SetWindowTitle(window, title);
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--help") == 0) {
+      print_usage(argv[0]);
+      return 0;
+    }
+  }
+
+  AppConfig config;
+  if (!parse_args(argc, argv, &config)) {
+    return 1;
+  }
+
+  printf("Mode: %s | strategy: %s\n", config.replay_only ? "replay" : "train", population_strategy_name(config.strategy));
+
   SDL_Window* window = NULL;
   SDL_Renderer* renderer = NULL;
   if (!init_sdl(&window, &renderer)) {
@@ -195,7 +249,7 @@ int main(void) {
 
   Agent saved_agent = {0};
   Agent* best_agent = NULL;
-  if (!setup_best_agent(&population, &saved_agent, &best_agent)) {
+  if (!setup_best_agent(&population, &saved_agent, &best_agent, &config)) {
     cleanup_sdl(window, renderer);
     return 1;
   }
@@ -209,7 +263,7 @@ int main(void) {
     Uint32 now = SDL_GetTicks();
 
     if (now - last_update >= update_delay) {
-      update_simulation(&game, &best_agent, &population);
+      update_simulation(&game, &best_agent, &population, &config);
       update_window_title(window, &game);
       last_update = now;
     }

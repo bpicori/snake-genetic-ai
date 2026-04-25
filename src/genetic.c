@@ -1,6 +1,7 @@
 #include "genetic.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "brain.h"
 
@@ -37,6 +38,20 @@ static void sort_agents_by_fitness(Agent agents[], int count) {
       }
     }
   }
+}
+
+static int tournament_parent_index(const Agent agents[], int tournament_size) {
+  int best_index = rand() % POPULATION_SIZE;
+
+  for (int i = 1; i < tournament_size; i++) {
+    int candidate_index = rand() % POPULATION_SIZE;
+
+    if (agents[candidate_index].fitness > agents[best_index].fitness) {
+      best_index = candidate_index;
+    }
+  }
+
+  return best_index;
 }
 
 /*
@@ -89,6 +104,7 @@ void population_init(Population* population) {
   population->generation = 0;
   population->best_agent_index = 0;
   population->best_fitness = 0.0f;
+  population->average_fitness = 0.0f;
   population->best_fitness_ever = 0.0f;
   population->stagnant_generations = 0;
   population->mutation_rate = MUTATION_RATE;
@@ -123,6 +139,7 @@ void population_init(Population* population) {
 void population_evaluate(Population* population) {
   population->best_agent_index = 0;
   population->best_fitness = 0.0f;
+  population->average_fitness = 0.0f;
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
     float total_fitness = 0.0f;
@@ -150,16 +167,20 @@ void population_evaluate(Population* population) {
       }
     }
 
-    population->agents[i].fitness = total_fitness / EVALUATION_GAMES;  // average fitness over all evaluation games
+    population->agents[i].fitness = total_fitness / EVALUATION_GAMES;
     population->agents[i].score = best_score;
     population->agents[i].steps = best_steps;
     population->agents[i].distance_reward = total_distance_reward / EVALUATION_GAMES;
+
+    population->average_fitness += population->agents[i].fitness;
 
     if (population->agents[i].fitness > population->best_fitness) {
       population->best_fitness = population->agents[i].fitness;
       population->best_agent_index = i;
     }
   }
+
+  population->average_fitness /= POPULATION_SIZE;
 }
 
 /*
@@ -285,6 +306,37 @@ void population_next_generation_v3_crossover(Population* population) {
   population->generation++;
 }
 
+void population_next_generation_v4_tournament_selection(Population* population) {
+  sort_agents_by_fitness(population->agents, POPULATION_SIZE);
+
+  Agent next_agents[POPULATION_SIZE];
+
+  for (int i = 0; i < ELITE_COUNT; i++) {
+    next_agents[i] = population->agents[i];
+  }
+
+  for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
+    int parent_a_index = tournament_parent_index(population->agents, 3);
+    int parent_b_index = tournament_parent_index(population->agents, 3);
+
+    next_agents[i].fitness = 0.0f;
+    next_agents[i].score = 0;
+    next_agents[i].steps = 0;
+    next_agents[i].distance_reward = 0;
+
+    brain_crossover(&next_agents[i].brain, &population->agents[parent_a_index].brain, &population->agents[parent_b_index].brain);
+    brain_mutate(&next_agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
+  }
+
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    population->agents[i] = next_agents[i];
+  }
+
+  population->best_agent_index = 0;
+  population->best_fitness = population->agents[0].fitness;
+  population->generation++;
+}
+
 void population_next_generation_v5_adaptive_mutation(Population* population) {
   update_adaptive_mutation(population);
 
@@ -319,4 +371,68 @@ void population_next_generation_v5_adaptive_mutation(Population* population) {
   population->generation++;
 }
 
-void population_next_generation(Population* population) { population_next_generation_v5_adaptive_mutation(population); }
+void population_next_generation(Population* population, PopulationStrategy strategy) {
+  switch (strategy) {
+    case POPULATION_STRATEGY_BEST_ONLY:
+      population_next_generation_v1_best_only(population);
+      break;
+    case POPULATION_STRATEGY_ELITE_PARENT_POOL:
+      population_next_generation_v2_elite_parent_pool(population);
+      break;
+    case POPULATION_STRATEGY_CROSSOVER:
+      population_next_generation_v3_crossover(population);
+      break;
+    case POPULATION_STRATEGY_TOURNAMENT:
+      population_next_generation_v4_tournament_selection(population);
+      break;
+    case POPULATION_STRATEGY_ADAPTIVE_MUTATION:
+      population_next_generation_v5_adaptive_mutation(population);
+      break;
+  }
+}
+
+const char* population_strategy_name(PopulationStrategy strategy) {
+  switch (strategy) {
+    case POPULATION_STRATEGY_BEST_ONLY:
+      return "v1";
+    case POPULATION_STRATEGY_ELITE_PARENT_POOL:
+      return "v2";
+    case POPULATION_STRATEGY_CROSSOVER:
+      return "v3";
+    case POPULATION_STRATEGY_TOURNAMENT:
+      return "v4";
+    case POPULATION_STRATEGY_ADAPTIVE_MUTATION:
+      return "adaptive";
+  }
+
+  return "adaptive";
+}
+
+bool population_strategy_from_name(const char* name, PopulationStrategy* strategy) {
+  if (strcmp(name, "v1") == 0 || strcmp(name, "best") == 0) {
+    *strategy = POPULATION_STRATEGY_BEST_ONLY;
+    return true;
+  }
+
+  if (strcmp(name, "v2") == 0 || strcmp(name, "elite") == 0) {
+    *strategy = POPULATION_STRATEGY_ELITE_PARENT_POOL;
+    return true;
+  }
+
+  if (strcmp(name, "v3") == 0 || strcmp(name, "crossover") == 0) {
+    *strategy = POPULATION_STRATEGY_CROSSOVER;
+    return true;
+  }
+
+  if (strcmp(name, "v4") == 0 || strcmp(name, "tournament") == 0) {
+    *strategy = POPULATION_STRATEGY_TOURNAMENT;
+    return true;
+  }
+
+  if (strcmp(name, "v5") == 0 || strcmp(name, "adaptive") == 0) {
+    *strategy = POPULATION_STRATEGY_ADAPTIVE_MUTATION;
+    return true;
+  }
+
+  return false;
+}
