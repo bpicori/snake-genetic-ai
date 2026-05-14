@@ -12,6 +12,54 @@ typedef struct {
   int end_index;
 } EvaluationJob;
 
+/* Scratch buffers for next-generation assembly (single-threaded path only). */
+static Agent g_next_generation_scratch[POPULATION_SIZE];
+static bool g_next_generation_scratch_ready = false;
+
+static void ensure_next_generation_scratch(void) {
+  if (g_next_generation_scratch_ready) {
+    return;
+  }
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    agent_init(&g_next_generation_scratch[i]);
+  }
+  g_next_generation_scratch_ready = true;
+}
+
+static void destroy_next_generation_scratch(void) {
+  if (!g_next_generation_scratch_ready) {
+    return;
+  }
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    agent_destroy(&g_next_generation_scratch[i]);
+  }
+  g_next_generation_scratch_ready = false;
+}
+
+void agent_init(Agent* agent) {
+  brain_init(&agent->brain);
+  agent->fitness = 0.0f;
+  agent->score = 0;
+  agent->steps = 0;
+  agent->distance_reward = 0;
+}
+
+void agent_destroy(Agent* agent) {
+  brain_destroy(&agent->brain);
+  agent->fitness = 0.0f;
+  agent->score = 0;
+  agent->steps = 0;
+  agent->distance_reward = 0;
+}
+
+void agent_copy(Agent* dest, const Agent* src) {
+  brain_copy(&dest->brain, &src->brain);
+  dest->fitness = src->fitness;
+  dest->score = src->score;
+  dest->steps = src->steps;
+  dest->distance_reward = src->distance_reward;
+}
+
 static void agent_randomize(Agent* agent) {
   brain_randomize(&agent->brain);
   agent->fitness = 0.0f;
@@ -189,8 +237,16 @@ void population_init(Population* population) {
   population->mutation_strength = MUTATION_STRENGTH;
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
+    agent_init(&population->agents[i]);
     agent_randomize(&population->agents[i]);
   }
+}
+
+void population_destroy(Population* population) {
+  for (int i = 0; i < POPULATION_SIZE; i++) {
+    agent_destroy(&population->agents[i]);
+  }
+  destroy_next_generation_scratch();
 }
 
 /*
@@ -298,17 +354,17 @@ void population_evaluate_parallel(Population* population) {
 void population_next_generation_v2_elite_parent_pool(Population* population) {
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
-  Agent next_agents[POPULATION_SIZE];
+  ensure_next_generation_scratch();
+  Agent* next_agents = g_next_generation_scratch;
 
   for (int i = 0; i < ELITE_COUNT; i++) {
-    next_agents[i] = population->agents[i];
+    agent_copy(&next_agents[i], &population->agents[i]);
   }
 
   for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
     int parent_index = rand() % PARENT_POOL_SIZE;
-    Agent parent = population->agents[parent_index];
 
-    next_agents[i] = parent;
+    agent_copy(&next_agents[i], &population->agents[parent_index]);
 
     brain_mutate(&next_agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
     next_agents[i].fitness = 0.0f;
@@ -317,7 +373,7 @@ void population_next_generation_v2_elite_parent_pool(Population* population) {
   }
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    population->agents[i] = next_agents[i];
+    agent_copy(&population->agents[i], &next_agents[i]);
   }
 
   population->best_agent_index = 0;
@@ -333,12 +389,12 @@ void population_next_generation_v2_elite_parent_pool(Population* population) {
  * brain and mutating it.
  */
 void population_next_generation_v1_best_only(Population* population) {
-  Agent best_agent = population->agents[population->best_agent_index];
+  const Agent* best_agent = &population->agents[population->best_agent_index];
 
-  population->agents[0] = best_agent;
+  agent_copy(&population->agents[0], best_agent);
 
   for (int i = 1; i < POPULATION_SIZE; i++) {
-    brain_copy(&population->agents[i].brain, &best_agent.brain);
+    brain_copy(&population->agents[i].brain, &best_agent->brain);
     brain_mutate(&population->agents[i].brain, MUTATION_RATE, MUTATION_STRENGTH);
 
     population->agents[i].fitness = 0.0f;
@@ -371,10 +427,11 @@ void population_next_generation_v1_best_only(Population* population) {
 void population_next_generation_v3_crossover(Population* population) {
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
-  Agent next_agents[POPULATION_SIZE];
+  ensure_next_generation_scratch();
+  Agent* next_agents = g_next_generation_scratch;
 
   for (int i = 0; i < ELITE_COUNT; i++) {
-    next_agents[i] = population->agents[i];
+    agent_copy(&next_agents[i], &population->agents[i]);
   }
 
   for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
@@ -394,7 +451,7 @@ void population_next_generation_v3_crossover(Population* population) {
   population->best_fitness = population->agents[0].fitness;
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    population->agents[i] = next_agents[i];
+    agent_copy(&population->agents[i], &next_agents[i]);
   }
 
   population->generation++;
@@ -403,10 +460,11 @@ void population_next_generation_v3_crossover(Population* population) {
 void population_next_generation_v4_tournament_selection(Population* population) {
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
-  Agent next_agents[POPULATION_SIZE];
+  ensure_next_generation_scratch();
+  Agent* next_agents = g_next_generation_scratch;
 
   for (int i = 0; i < ELITE_COUNT; i++) {
-    next_agents[i] = population->agents[i];
+    agent_copy(&next_agents[i], &population->agents[i]);
   }
 
   for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
@@ -423,7 +481,7 @@ void population_next_generation_v4_tournament_selection(Population* population) 
   }
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    population->agents[i] = next_agents[i];
+    agent_copy(&population->agents[i], &next_agents[i]);
   }
 
   population->best_agent_index = 0;
@@ -436,10 +494,11 @@ void population_next_generation_v5_adaptive_mutation(Population* population) {
 
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
-  Agent next_agents[POPULATION_SIZE];
+  ensure_next_generation_scratch();
+  Agent* next_agents = g_next_generation_scratch;
 
   for (int i = 0; i < ELITE_COUNT; i++) {
-    next_agents[i] = population->agents[i];
+    agent_copy(&next_agents[i], &population->agents[i]);
   }
 
   for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
@@ -457,7 +516,7 @@ void population_next_generation_v5_adaptive_mutation(Population* population) {
   }
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    population->agents[i] = next_agents[i];
+    agent_copy(&population->agents[i], &next_agents[i]);
   }
 
   population->best_agent_index = 0;
@@ -470,10 +529,11 @@ void population_next_generation_v6_adaptive_conservative(Population* population)
 
   sort_agents_by_fitness(population->agents, POPULATION_SIZE);
 
-  Agent next_agents[POPULATION_SIZE];
+  ensure_next_generation_scratch();
+  Agent* next_agents = g_next_generation_scratch;
 
   for (int i = 0; i < ELITE_COUNT; i++) {
-    next_agents[i] = population->agents[i];
+    agent_copy(&next_agents[i], &population->agents[i]);
   }
 
   for (int i = ELITE_COUNT; i < POPULATION_SIZE; i++) {
@@ -491,7 +551,7 @@ void population_next_generation_v6_adaptive_conservative(Population* population)
   }
 
   for (int i = 0; i < POPULATION_SIZE; i++) {
-    population->agents[i] = next_agents[i];
+    agent_copy(&population->agents[i], &next_agents[i]);
   }
 
   population->best_agent_index = 0;

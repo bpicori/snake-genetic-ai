@@ -1,7 +1,10 @@
 #ifndef BRAIN_H
 #define BRAIN_H
 
+#include <stdbool.h>
+
 #include "game.h"
+#include "tensor.h"
 
 /*
  * Neural network input layout.
@@ -51,12 +54,14 @@
 #define BRAIN_OUTPUTS 3
 
 typedef struct {
-  float w1[BRAIN_INPUTS][BRAIN_HIDDEN];
-  float b1[BRAIN_HIDDEN];
-
-  float w2[BRAIN_HIDDEN][BRAIN_OUTPUTS];
-  float b2[BRAIN_OUTPUTS];
+  Tensor* w1; /* [BRAIN_INPUTS, BRAIN_HIDDEN] */
+  Tensor* b1; /* [BRAIN_HIDDEN] */
+  Tensor* w2; /* [BRAIN_HIDDEN, BRAIN_OUTPUTS] */
+  Tensor* b2; /* [BRAIN_OUTPUTS] */
 } Brain;
+
+void brain_init(Brain* brain);
+void brain_destroy(Brain* brain);
 
 void brain_randomize(Brain* brain);
 Direction brain_choose_direction(const Brain* brain, const Game* game);

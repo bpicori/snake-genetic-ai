@@ -3,9 +3,10 @@
 #include <stdio.h>
 
 #include "brain.h"
+#include "genetic.h"
 
 bool training_session_init(TrainingSession* session, const AppConfig* config) {
-  session->saved_agent = (Agent){0};
+  agent_init(&session->saved_agent);
   session->best_agent = NULL;
   session->best_fitness_ever = 0.0f;
 
@@ -14,6 +15,8 @@ bool training_session_init(TrainingSession* session, const AppConfig* config) {
   if (config->replay_only) {
     if (!brain_load(&session->saved_agent.brain, config->brain_path)) {
       printf("No saved brain found at %s\n", config->brain_path);
+      agent_destroy(&session->saved_agent);
+      population_destroy(&session->population);
       return false;
     }
 
@@ -31,6 +34,12 @@ bool training_session_init(TrainingSession* session, const AppConfig* config) {
   }
 
   return true;
+}
+
+void training_session_destroy(TrainingSession* session) {
+  population_destroy(&session->population);
+  agent_destroy(&session->saved_agent);
+  session->best_agent = NULL;
 }
 
 Agent* training_session_best_agent(TrainingSession* session) { return session->best_agent; }
@@ -80,6 +89,8 @@ int training_run_headless(const AppConfig* config) {
   }
 
   training_session_train_generations(&session, config->generations, config);
+
+  training_session_destroy(&session);
 
   return 0;
 }

@@ -1,22 +1,24 @@
 #include "brain.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-// Returns true or false randomly with about 50% chance.
+enum {
+  BRAIN_FILE_MAGIC = 0x736e6b31u, /* "snk1" — toy format, not compatible with pre-tensor raw dumps */
+  BRAIN_FILE_VERSION = 1u,
+};
+
+static const size_t k_brain_payload_floats =
+    (size_t)BRAIN_INPUTS * BRAIN_HIDDEN + BRAIN_HIDDEN + (size_t)BRAIN_HIDDEN * BRAIN_OUTPUTS + BRAIN_OUTPUTS;
+
 static bool random_bool(void) { return rand() % 2 == 0; }
 
-// Creates a random neural-network weight between -1.0 and 1.0.
-static float random_weight(void) { return ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f; }
-
-// Returns a random float between 0.0 and 1.0.
 static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
 
-// Creates a small random change between -mutation_strength and
-// +mutation_strength.
 static float random_mutation(float mutation_strength) { return (random_float() * 2.0f - 1.0f) * mutation_strength; }
-// Converts the current direction into the direction produced by turning left.
+
 static Direction turn_left(Direction direction) {
   switch (direction) {
     case UP:
@@ -31,7 +33,6 @@ static Direction turn_left(Direction direction) {
   return direction;
 }
 
-// Converts the current direction into the direction produced by turning right.
 static Direction turn_right(Direction direction) {
   switch (direction) {
     case UP:
@@ -46,13 +47,6 @@ static Direction turn_right(Direction direction) {
   return direction;
 }
 
-/*
- * Converts a neural-network action into an actual game direction.
- *
- * action 0 = turn left
- * action 1 = keep going straight
- * action 2 = turn right
- */
 static Direction direction_from_action(Direction current, int action) {
   if (action == 0) {
     return turn_left(current);
@@ -175,12 +169,6 @@ static float normalized_reachable_space(const Game* game, Vec2 start) {
   return (float)reachable / (float)MAX_SNAKE_LENGTH;
 }
 
-/*
- * Converts the current Game state into the input values used by the brain.
- *
- * The inputs describe nearby danger, current movement direction, food position,
- * and how much free space exists around the snake head.
- */
 static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   Direction current = game->snake.direction;
   Vec2 head = game->snake.body[0];
@@ -222,23 +210,6 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   inputs[21] = normalized_reachable_space(game, right_head);
 }
 
-/*
- * Mutates one weight or bias value.
- *
- * mutation_rate controls the chance that the value changes.
- * mutation_strength controls how large the change can be.
- *
- * Example:
- *   value = 0.70
- *   mutation_rate = 0.05      // 5% chance this value changes
- *   mutation_strength = 0.20  // change is between -0.20 and +0.20
- *
- * If this value is selected for mutation:
- *   random change = -0.13
- *   new value = 0.70 + (-0.13) = 0.57
- *
- * If it is not selected, it stays 0.70.
- */
 static float mutate_value(float value, float mutation_rate, float mutation_strength) {
   if (random_float() < mutation_rate) {
     value += random_mutation(mutation_strength);
@@ -247,169 +218,130 @@ static float mutate_value(float value, float mutation_rate, float mutation_stren
   return value;
 }
 
-/*
- * Fills a brain with random weights and biases.
- *
- * This is used when creating the first generation of agents before any
- * evolution has happened.
- */
-void brain_randomize(Brain* brain) {
-  for (int i = 0; i < BRAIN_INPUTS; i++) {
-    for (int j = 0; j < BRAIN_HIDDEN; j++) {
-      brain->w1[i][j] = random_weight();
-    }
-  }
-
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    brain->b1[i] = random_weight();
-  }
-
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-      brain->w2[i][j] = random_weight();
-    }
-  }
-
-  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
-    brain->b2[i] = random_weight();
+static void shift_rand_tensor_to_minus_one_one(Tensor* t) {
+  for (size_t i = 0; i < t->element_count; i++) {
+    t->data[i] = t->data[i] * 2.0f - 1.0f;
   }
 }
 
-/*
- * Runs the neural network and chooses the snake's next direction.
- *
- * Flow:
- *   1. Build input values from the game state.
- *   2. Compute hidden neuron values.
- *   3. Compute output scores.
- *   4. Pick the highest-scoring output.
- *   5. Convert that output into left, straight, or right movement.
- */
+void brain_init(Brain* brain) {
+  brain->w1 = NULL;
+  brain->b1 = NULL;
+  brain->w2 = NULL;
+  brain->b2 = NULL;
+
+  size_t d_w1[] = {(size_t)BRAIN_INPUTS, (size_t)BRAIN_HIDDEN};
+  size_t d_b1[] = {(size_t)BRAIN_HIDDEN};
+  size_t d_w2[] = {(size_t)BRAIN_HIDDEN, (size_t)BRAIN_OUTPUTS};
+  size_t d_b2[] = {(size_t)BRAIN_OUTPUTS};
+
+  brain->w1 = tensor_create(2, d_w1);
+  brain->b1 = tensor_create(1, d_b1);
+  brain->w2 = tensor_create(2, d_w2);
+  brain->b2 = tensor_create(1, d_b2);
+}
+
+void brain_destroy(Brain* brain) {
+  tensor_destroy(brain->w1);
+  tensor_destroy(brain->b1);
+  tensor_destroy(brain->w2);
+  tensor_destroy(brain->b2);
+  brain->w1 = NULL;
+  brain->b1 = NULL;
+  brain->w2 = NULL;
+  brain->b2 = NULL;
+}
+
+void brain_randomize(Brain* brain) {
+  tensor_destroy(brain->w1);
+  tensor_destroy(brain->b1);
+  tensor_destroy(brain->w2);
+  tensor_destroy(brain->b2);
+
+  size_t d_w1[] = {(size_t)BRAIN_INPUTS, (size_t)BRAIN_HIDDEN};
+  size_t d_b1[] = {(size_t)BRAIN_HIDDEN};
+  size_t d_w2[] = {(size_t)BRAIN_HIDDEN, (size_t)BRAIN_OUTPUTS};
+  size_t d_b2[] = {(size_t)BRAIN_OUTPUTS};
+
+  brain->w1 = tensor_rand(2, d_w1);
+  brain->b1 = tensor_rand(1, d_b1);
+  brain->w2 = tensor_rand(2, d_w2);
+  brain->b2 = tensor_rand(1, d_b2);
+
+  shift_rand_tensor_to_minus_one_one(brain->w1);
+  shift_rand_tensor_to_minus_one_one(brain->b1);
+  shift_rand_tensor_to_minus_one_one(brain->w2);
+  shift_rand_tensor_to_minus_one_one(brain->b2);
+}
+
 Direction brain_choose_direction(const Brain* brain, const Game* game) {
   float inputs[BRAIN_INPUTS];
-  float hidden[BRAIN_HIDDEN];
-  float outputs[BRAIN_OUTPUTS];
-
   build_inputs(game, inputs);
 
-  for (int j = 0; j < BRAIN_HIDDEN; j++) {
-    float sum = brain->b1[j];
+  size_t x_dims[] = {1, (size_t)BRAIN_INPUTS};
+  Tensor* x = tensor_from_array(2, x_dims, inputs);
 
-    for (int i = 0; i < BRAIN_INPUTS; i++) {
-      sum += inputs[i] * brain->w1[i][j];
-    }
+  Tensor* z1 = tensor_matmul(x, brain->w1);
+  Tensor* z1_b = tensor_add_bias(z1, brain->b1);
+  Tensor* h = tensor_tanh(z1_b);
+  Tensor* z2 = tensor_matmul(h, brain->w2);
+  Tensor* y = tensor_add_bias(z2, brain->b2);
 
-    hidden[j] = tanhf(sum);
-  }
+  int best_action = (int)tensor_argmax(y);
 
-  for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-    float sum = brain->b2[j];
-
-    for (int i = 0; i < BRAIN_HIDDEN; i++) {
-      sum += hidden[i] * brain->w2[i][j];
-    }
-
-    outputs[j] = sum;
-  }
-
-  int best_action = 0;
-
-  for (int i = 1; i < BRAIN_OUTPUTS; i++) {
-    if (outputs[i] > outputs[best_action]) {
-      best_action = i;
-    }
-  }
+  tensor_destroy(y);
+  tensor_destroy(z2);
+  tensor_destroy(h);
+  tensor_destroy(z1_b);
+  tensor_destroy(z1);
+  tensor_destroy(x);
 
   return direction_from_action(game->snake.direction, best_action);
 }
 
-/*
- * Copies all weights and biases from one brain to another.
- *
- * Used when an agent survives unchanged or when creating a child from a parent.
- */
 void brain_copy(Brain* dest, const Brain* src) {
-  for (int i = 0; i < BRAIN_INPUTS; i++) {
-    for (int j = 0; j < BRAIN_HIDDEN; j++) {
-      dest->w1[i][j] = src->w1[i][j];
-    }
-  }
-
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    dest->b1[i] = src->b1[i];
-  }
-
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-      dest->w2[i][j] = src->w2[i][j];
-    }
-  }
-
-  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
-    dest->b2[i] = src->b2[i];
-  }
+  memcpy(dest->w1->data, src->w1->data, dest->w1->element_count * sizeof(float));
+  memcpy(dest->b1->data, src->b1->data, dest->b1->element_count * sizeof(float));
+  memcpy(dest->w2->data, src->w2->data, dest->w2->element_count * sizeof(float));
+  memcpy(dest->b2->data, src->b2->data, dest->b2->element_count * sizeof(float));
 }
-/*
- * Applies random mutations to all weights and biases in the brain.
- *
- * Most values stay unchanged. A few values are nudged slightly, which creates
- * variation between generations.
- */
+
 void brain_mutate(Brain* brain, float mutation_rate, float mutation_strength) {
-  for (int i = 0; i < BRAIN_INPUTS; i++) {
-    for (int j = 0; j < BRAIN_HIDDEN; j++) {
-      brain->w1[i][j] = mutate_value(brain->w1[i][j], mutation_rate, mutation_strength);
-    }
+  for (size_t i = 0; i < brain->w1->element_count; i++) {
+    brain->w1->data[i] = mutate_value(brain->w1->data[i], mutation_rate, mutation_strength);
   }
 
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    brain->b1[i] = mutate_value(brain->b1[i], mutation_rate, mutation_strength);
+  for (size_t i = 0; i < brain->b1->element_count; i++) {
+    brain->b1->data[i] = mutate_value(brain->b1->data[i], mutation_rate, mutation_strength);
   }
 
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-      brain->w2[i][j] = mutate_value(brain->w2[i][j], mutation_rate, mutation_strength);
-    }
+  for (size_t i = 0; i < brain->w2->element_count; i++) {
+    brain->w2->data[i] = mutate_value(brain->w2->data[i], mutation_rate, mutation_strength);
   }
 
-  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
-    brain->b2[i] = mutate_value(brain->b2[i], mutation_rate, mutation_strength);
+  for (size_t i = 0; i < brain->b2->element_count; i++) {
+    brain->b2->data[i] = mutate_value(brain->b2->data[i], mutation_rate, mutation_strength);
   }
 }
 
-/*
- * Creates a child brain from two parent brains.
- *
- * For every weight and bias, the child randomly inherits the value from either
- * parent A or parent B. Mutation can be applied afterward.
- */
 void brain_crossover(Brain* child, const Brain* parent_a, const Brain* parent_b) {
-  for (int i = 0; i < BRAIN_INPUTS; i++) {
-    for (int j = 0; j < BRAIN_HIDDEN; j++) {
-      child->w1[i][j] = random_bool() ? parent_a->w1[i][j] : parent_b->w1[i][j];
-    }
+  for (size_t i = 0; i < child->w1->element_count; i++) {
+    child->w1->data[i] = random_bool() ? parent_a->w1->data[i] : parent_b->w1->data[i];
   }
 
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    child->b1[i] = random_bool() ? parent_a->b1[i] : parent_b->b1[i];
+  for (size_t i = 0; i < child->b1->element_count; i++) {
+    child->b1->data[i] = random_bool() ? parent_a->b1->data[i] : parent_b->b1->data[i];
   }
 
-  for (int i = 0; i < BRAIN_HIDDEN; i++) {
-    for (int j = 0; j < BRAIN_OUTPUTS; j++) {
-      child->w2[i][j] = random_bool() ? parent_a->w2[i][j] : parent_b->w2[i][j];
-    }
+  for (size_t i = 0; i < child->w2->element_count; i++) {
+    child->w2->data[i] = random_bool() ? parent_a->w2->data[i] : parent_b->w2->data[i];
   }
 
-  for (int i = 0; i < BRAIN_OUTPUTS; i++) {
-    child->b2[i] = random_bool() ? parent_a->b2[i] : parent_b->b2[i];
+  for (size_t i = 0; i < child->b2->element_count; i++) {
+    child->b2->data[i] = random_bool() ? parent_a->b2->data[i] : parent_b->b2->data[i];
   }
 }
 
-/*
- * Saves the brain's weights and biases to a binary file.
- *
- * This lets us keep the best trained brain after the program exits.
- */
 bool brain_save(const Brain* brain, const char* path) {
   FILE* file = fopen(path, "wb");
 
@@ -417,17 +349,25 @@ bool brain_save(const Brain* brain, const char* path) {
     return false;
   }
 
-  size_t written = fwrite(brain, sizeof(Brain), 1, file);
+  uint32_t magic = BRAIN_FILE_MAGIC;
+  uint32_t version = BRAIN_FILE_VERSION;
+
+  if (fwrite(&magic, sizeof magic, 1, file) != 1 || fwrite(&version, sizeof version, 1, file) != 1) {
+    fclose(file);
+    return false;
+  }
+
+  size_t n = 0;
+  n += fwrite(brain->w1->data, sizeof(float), brain->w1->element_count, file);
+  n += fwrite(brain->b1->data, sizeof(float), brain->b1->element_count, file);
+  n += fwrite(brain->w2->data, sizeof(float), brain->w2->element_count, file);
+  n += fwrite(brain->b2->data, sizeof(float), brain->b2->element_count, file);
+
   fclose(file);
 
-  return written == 1;
+  return n == k_brain_payload_floats;
 }
 
-/*
- * Loads previously saved weights and biases from a binary file.
- *
- * Returns false if the file does not exist or cannot be read.
- */
 bool brain_load(Brain* brain, const char* path) {
   FILE* file = fopen(path, "rb");
 
@@ -435,8 +375,26 @@ bool brain_load(Brain* brain, const char* path) {
     return false;
   }
 
-  size_t read = fread(brain, sizeof(Brain), 1, file);
+  uint32_t magic = 0;
+  uint32_t version = 0;
+
+  if (fread(&magic, sizeof magic, 1, file) != 1 || fread(&version, sizeof version, 1, file) != 1) {
+    fclose(file);
+    return false;
+  }
+
+  if (magic != BRAIN_FILE_MAGIC || version != BRAIN_FILE_VERSION) {
+    fclose(file);
+    return false;
+  }
+
+  size_t n = 0;
+  n += fread(brain->w1->data, sizeof(float), brain->w1->element_count, file);
+  n += fread(brain->b1->data, sizeof(float), brain->b1->element_count, file);
+  n += fread(brain->w2->data, sizeof(float), brain->w2->element_count, file);
+  n += fread(brain->b2->data, sizeof(float), brain->b2->element_count, file);
+
   fclose(file);
 
-  return read == 1;
+  return n == k_brain_payload_floats;
 }

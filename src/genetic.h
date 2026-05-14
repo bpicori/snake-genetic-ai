@@ -37,6 +37,10 @@ typedef struct {
   int distance_reward;
 } Agent;
 
+void agent_init(Agent* agent);
+void agent_destroy(Agent* agent);
+void agent_copy(Agent* dest, const Agent* src);
+
 typedef enum {
   POPULATION_STRATEGY_BEST_ONLY,
   POPULATION_STRATEGY_ELITE_PARENT_POOL,
@@ -60,6 +64,7 @@ typedef struct {
 } Population;
 
 void population_init(Population* population);
+void population_destroy(Population* population);
 void population_evaluate(Population* population);
 void population_evaluate_parallel(Population* population);
 void population_next_generation(Population* population, PopulationStrategy strategy);

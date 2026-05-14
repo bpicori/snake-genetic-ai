@@ -173,6 +173,8 @@ int main(int argc, char* argv[]) {
     SDL_Delay(FRAME_DELAY_MS);
   }
 
+  training_session_destroy(&training_session);
+
   cleanup_sdl(window, renderer);
 
   return 0;
