@@ -1,10 +1,20 @@
 CC = cc
-CFLAGS = -Wall -Wextra -std=c99 -O3 -march=native -pthread -Isrc/vendor/zero-tensor
+CFLAGS = -Wall -Wextra -std=c99 -O3 -march=native -pthread -Ivendor/zero-tensor/include
 SDL_CFLAGS = $(shell sdl2-config --cflags)
 SDL_LIBS = $(shell sdl2-config --libs)
 
-SRC = src/main.c src/config.c src/training.c src/game.c src/brain.c src/genetic.c src/rng.c src/vendor/zero-tensor/tensor.c
+SRC = src/main.c src/config.c src/training.c src/game.c src/brain.c src/genetic.c src/rng.c vendor/zero-tensor/src/tensor.c
 OUT = out/snake-ai
+
+.PHONY: submodules submodule-status
+
+# After clone: fetch submodule commits recorded in this repo (required before build).
+submodules:
+	git submodule sync --recursive
+	git submodule update --init --recursive
+
+submodule-status:
+	git submodule status
 
 all:
 	mkdir -p out

@@ -1,0 +1,3 @@
+[submodule "vendor/zero-tensor"]
+	path = vendor/zero-tensor
+	url = https://github.com/bpicori/zero-tensor.git
