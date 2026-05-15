@@ -2,7 +2,51 @@
 
 #include <stdlib.h>
 
+#include "rng.h"
+
 static bool vec2_equals(Vec2 a, Vec2 b) { return a.x == b.x && a.y == b.y; }
+
+Vec2 game_direction_delta(Direction direction) {
+  switch (direction) {
+    case UP:
+      return (Vec2){0, -1};
+    case DOWN:
+      return (Vec2){0, 1};
+    case LEFT:
+      return (Vec2){-1, 0};
+    case RIGHT:
+      return (Vec2){1, 0};
+  }
+  return (Vec2){0, 0};
+}
+
+Direction game_turn_left(Direction direction) {
+  switch (direction) {
+    case UP:
+      return LEFT;
+    case LEFT:
+      return DOWN;
+    case DOWN:
+      return RIGHT;
+    case RIGHT:
+      return UP;
+  }
+  return direction;
+}
+
+Direction game_turn_right(Direction direction) {
+  switch (direction) {
+    case UP:
+      return RIGHT;
+    case RIGHT:
+      return DOWN;
+    case DOWN:
+      return LEFT;
+    case LEFT:
+      return UP;
+  }
+  return direction;
+}
 
 static bool snake_contains_position(Snake* snake, Vec2 position) {
   for (int i = 0; i < snake->length; i++) {
@@ -16,7 +60,7 @@ static bool snake_contains_position(Snake* snake, Vec2 position) {
 static void spawn_food(Game* game) {
   Vec2 position;
   do {
-    position = (Vec2){rand() % GRID_WIDTH, rand() % GRID_HEIGHT};
+    position = (Vec2){rng_int(GRID_WIDTH), rng_int(GRID_HEIGHT)};
   } while (snake_contains_position(&game->snake, position));
 
   game->food = position;
@@ -24,20 +68,9 @@ static void spawn_food(Game* game) {
 
 static Vec2 next_head_for_direction(const Game* game, Direction direction) {
   Vec2 head = game->snake.body[0];
-  switch (direction) {
-    case UP:
-      head.y -= 1;
-      break;
-    case DOWN:
-      head.y += 1;
-      break;
-    case LEFT:
-      head.x -= 1;
-      break;
-    case RIGHT:
-      head.x += 1;
-      break;
-  }
+  Vec2 d = game_direction_delta(direction);
+  head.x += d.x;
+  head.y += d.y;
   return head;
 }
 
@@ -96,21 +129,9 @@ void game_update(Game* game) {
   Vec2 new_head = snake->body[0];
   int old_distance = distance_to_food(game, new_head);
 
-  // update the snake's head position based on its direction
-  switch (snake->direction) {
-    case UP:
-      new_head.y -= 1;
-      break;
-    case DOWN:
-      new_head.y += 1;
-      break;
-    case LEFT:
-      new_head.x -= 1;
-      break;
-    case RIGHT:
-      new_head.x += 1;
-      break;
-  }
+  Vec2 dhead = game_direction_delta(snake->direction);
+  new_head.x += dhead.x;
+  new_head.y += dhead.y;
 
   // check if the snake has hit the wall
   if (new_head.x < 0 || new_head.x >= GRID_WIDTH || new_head.y < 0 || new_head.y >= GRID_HEIGHT) {

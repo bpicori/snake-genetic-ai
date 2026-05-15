@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "rng.h"
+
 void app_config_print_usage(const char* program_name) {
   printf(
       "Usage: %s (--train --no-render | --replay) [--generations count] "
@@ -125,7 +127,7 @@ AppConfigParseResult app_config_parse(int argc, char* argv[], AppConfig* config)
 
 void app_config_seed_random(const AppConfig* config) {
   unsigned int seed = config->seed_provided ? config->seed : (unsigned int)time(NULL);
-  srand(seed);
+  rng_seed(seed);
   printf("Random seed: %u%s\n", seed, config->seed_provided ? " (fixed)" : "");
 }
 

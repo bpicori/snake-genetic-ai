@@ -53,6 +53,10 @@
 #define BRAIN_HIDDEN 32
 #define BRAIN_OUTPUTS 3
 
+#define BRAIN_ACTION_TURN_LEFT 0
+#define BRAIN_ACTION_STRAIGHT 1
+#define BRAIN_ACTION_TURN_RIGHT 2
+
 typedef struct {
   Tensor* w1; /* [BRAIN_INPUTS, BRAIN_HIDDEN] */
   Tensor* b1; /* [BRAIN_HIDDEN] */

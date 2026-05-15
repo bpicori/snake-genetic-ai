@@ -49,6 +49,36 @@ Tensor* tensor_rand(size_t ndim, const size_t* dims) {
   return t;
 }
 
+void tensor_fill_uniform(Tensor* t, float min, float max) {
+  assert(min < max);
+  float span = max - min;
+  size_t n = t->element_count;
+  for (size_t i = 0; i < n; i++) {
+    float u = (float)rand() / ((float)RAND_MAX + 1.0f);
+    t->data[i] = min + span * u;
+  }
+}
+
+Tensor* tensor_rand_uniform(size_t ndim, const size_t* dims, float min, float max) {
+  assert(min < max);
+  Tensor* t = tensor_create(ndim, dims);
+  tensor_fill_uniform(t, min, max);
+  return t;
+}
+
+void tensor_copy_into(Tensor* dst, const Tensor* src) {
+  assert_same_shape(dst, src);
+  memcpy(dst->data, src->data, dst->element_count * sizeof(float));
+}
+
+size_t tensor_write_raw(const Tensor* t, FILE* f) {
+  return fwrite(t->data, sizeof(float), t->element_count, f);
+}
+
+size_t tensor_read_raw(Tensor* t, FILE* f) {
+  return fread(t->data, sizeof(float), t->element_count, f);
+}
+
 float tensor_get(const Tensor* t, const size_t* idx) {
   size_t offset = 0;
   for (size_t i = 0; i < t->ndim; i++) {

@@ -35,4 +35,9 @@ void game_update(Game* game);
 void game_set_direction(Game* game, Direction direction);
 bool game_is_direction_safe(const Game* game, Direction direction);
 
+/* Grid / movement helpers shared by game simulation and brain sensors. */
+Vec2 game_direction_delta(Direction direction);
+Direction game_turn_left(Direction direction);
+Direction game_turn_right(Direction direction);
+
 #endif

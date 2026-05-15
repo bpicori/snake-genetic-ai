@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
+#include "rng.h"
 
 enum {
   BRAIN_FILE_MAGIC = 0x736e6b31u, /* "snk1" — toy format, not compatible with pre-tensor raw dumps */
@@ -13,73 +13,44 @@ enum {
 static const size_t k_brain_payload_floats =
     (size_t)BRAIN_INPUTS * BRAIN_HIDDEN + BRAIN_HIDDEN + (size_t)BRAIN_HIDDEN * BRAIN_OUTPUTS + BRAIN_OUTPUTS;
 
-static bool random_bool(void) { return rand() % 2 == 0; }
+#define BRAIN_NUM_TENSORS 4
 
-static float random_float(void) { return (float)rand() / (float)RAND_MAX; }
-
-static float random_mutation(float mutation_strength) { return (random_float() * 2.0f - 1.0f) * mutation_strength; }
-
-static Direction turn_left(Direction direction) {
-  switch (direction) {
-    case UP:
-      return LEFT;
-    case LEFT:
-      return DOWN;
-    case DOWN:
-      return RIGHT;
-    case RIGHT:
-      return UP;
-  }
-  return direction;
+static void brain_tensors(const Brain* brain, Tensor* tensors[BRAIN_NUM_TENSORS]) {
+  tensors[0] = brain->w1;
+  tensors[1] = brain->b1;
+  tensors[2] = brain->w2;
+  tensors[3] = brain->b2;
 }
 
-static Direction turn_right(Direction direction) {
-  switch (direction) {
-    case UP:
-      return RIGHT;
-    case RIGHT:
-      return DOWN;
-    case DOWN:
-      return LEFT;
-    case LEFT:
-      return UP;
-  }
-  return direction;
+static void brain_alloc_tensors(Brain* brain) {
+  size_t d_w1[] = {(size_t)BRAIN_INPUTS, (size_t)BRAIN_HIDDEN};
+  size_t d_b1[] = {(size_t)BRAIN_HIDDEN};
+  size_t d_w2[] = {(size_t)BRAIN_HIDDEN, (size_t)BRAIN_OUTPUTS};
+  size_t d_b2[] = {(size_t)BRAIN_OUTPUTS};
+
+  brain->w1 = tensor_create(2, d_w1);
+  brain->b1 = tensor_create(1, d_b1);
+  brain->w2 = tensor_create(2, d_w2);
+  brain->b2 = tensor_create(1, d_b2);
 }
 
 static Direction direction_from_action(Direction current, int action) {
-  if (action == 0) {
-    return turn_left(current);
+  if (action == BRAIN_ACTION_TURN_LEFT) {
+    return game_turn_left(current);
   }
 
-  if (action == 2) {
-    return turn_right(current);
+  if (action == BRAIN_ACTION_TURN_RIGHT) {
+    return game_turn_right(current);
   }
 
   return current;
-}
-
-static Vec2 direction_delta(Direction direction) {
-  switch (direction) {
-    case UP:
-      return (Vec2){0, -1};
-    case DOWN:
-      return (Vec2){0, 1};
-    case LEFT:
-      return (Vec2){-1, 0};
-    case RIGHT:
-      return (Vec2){1, 0};
-  }
-
-  return (Vec2){0, 0};
 }
 
 static float max_distance_for_direction(Direction direction) {
   return direction == LEFT || direction == RIGHT ? (float)GRID_WIDTH : (float)GRID_HEIGHT;
 }
 
-static float normalized_wall_distance(Vec2 head, Direction direction) {
-  Vec2 delta = direction_delta(direction);
+static float normalized_wall_distance(Vec2 head, Vec2 delta, Direction direction) {
   int distance = 0;
   Vec2 position = head;
 
@@ -97,8 +68,7 @@ static float normalized_wall_distance(Vec2 head, Direction direction) {
   return (float)distance / max_distance_for_direction(direction);
 }
 
-static float normalized_body_distance(const Game* game, Vec2 head, Direction direction) {
-  Vec2 delta = direction_delta(direction);
+static float normalized_body_distance(const Game* game, Vec2 head, Vec2 delta, Direction direction) {
   int distance = 0;
   Vec2 position = head;
 
@@ -173,8 +143,12 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   Direction current = game->snake.direction;
   Vec2 head = game->snake.body[0];
 
-  Direction left = turn_left(current);
-  Direction right = turn_right(current);
+  Direction left = game_turn_left(current);
+  Direction right = game_turn_right(current);
+
+  Vec2 d_cur = game_direction_delta(current);
+  Vec2 d_left = game_direction_delta(left);
+  Vec2 d_right = game_direction_delta(right);
 
   inputs[0] = game_is_direction_safe(game, current) ? 0.0f : 1.0f;
   inputs[1] = game_is_direction_safe(game, left) ? 0.0f : 1.0f;
@@ -190,20 +164,16 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
   inputs[10] = game->food.x > head.x ? 1.0f : 0.0f;
   inputs[11] = (float)(game->food.x - head.x) / GRID_WIDTH;
   inputs[12] = (float)(game->food.y - head.y) / GRID_HEIGHT;
-  inputs[13] = normalized_wall_distance(head, current);
-  inputs[14] = normalized_wall_distance(head, left);
-  inputs[15] = normalized_wall_distance(head, right);
-  inputs[16] = normalized_body_distance(game, head, current);
-  inputs[17] = normalized_body_distance(game, head, left);
-  inputs[18] = normalized_body_distance(game, head, right);
+  inputs[13] = normalized_wall_distance(head, d_cur, current);
+  inputs[14] = normalized_wall_distance(head, d_left, left);
+  inputs[15] = normalized_wall_distance(head, d_right, right);
+  inputs[16] = normalized_body_distance(game, head, d_cur, current);
+  inputs[17] = normalized_body_distance(game, head, d_left, left);
+  inputs[18] = normalized_body_distance(game, head, d_right, right);
 
-  Vec2 straight_delta = direction_delta(current);
-  Vec2 left_delta = direction_delta(left);
-  Vec2 right_delta = direction_delta(right);
-
-  Vec2 straight_head = {head.x + straight_delta.x, head.y + straight_delta.y};
-  Vec2 left_head = {head.x + left_delta.x, head.y + left_delta.y};
-  Vec2 right_head = {head.x + right_delta.x, head.y + right_delta.y};
+  Vec2 straight_head = {head.x + d_cur.x, head.y + d_cur.y};
+  Vec2 left_head = {head.x + d_left.x, head.y + d_left.y};
+  Vec2 right_head = {head.x + d_right.x, head.y + d_right.y};
 
   inputs[19] = normalized_reachable_space(game, straight_head);
   inputs[20] = normalized_reachable_space(game, left_head);
@@ -211,17 +181,11 @@ static void build_inputs(const Game* game, float inputs[BRAIN_INPUTS]) {
 }
 
 static float mutate_value(float value, float mutation_rate, float mutation_strength) {
-  if (random_float() < mutation_rate) {
-    value += random_mutation(mutation_strength);
+  if (rng_uniform(0.0f, 1.0f) < mutation_rate) {
+    value += rng_uniform(-mutation_strength, mutation_strength);
   }
 
   return value;
-}
-
-static void shift_rand_tensor_to_minus_one_one(Tensor* t) {
-  for (size_t i = 0; i < t->element_count; i++) {
-    t->data[i] = t->data[i] * 2.0f - 1.0f;
-  }
 }
 
 void brain_init(Brain* brain) {
@@ -229,23 +193,15 @@ void brain_init(Brain* brain) {
   brain->b1 = NULL;
   brain->w2 = NULL;
   brain->b2 = NULL;
-
-  size_t d_w1[] = {(size_t)BRAIN_INPUTS, (size_t)BRAIN_HIDDEN};
-  size_t d_b1[] = {(size_t)BRAIN_HIDDEN};
-  size_t d_w2[] = {(size_t)BRAIN_HIDDEN, (size_t)BRAIN_OUTPUTS};
-  size_t d_b2[] = {(size_t)BRAIN_OUTPUTS};
-
-  brain->w1 = tensor_create(2, d_w1);
-  brain->b1 = tensor_create(1, d_b1);
-  brain->w2 = tensor_create(2, d_w2);
-  brain->b2 = tensor_create(1, d_b2);
+  brain_alloc_tensors(brain);
 }
 
 void brain_destroy(Brain* brain) {
-  tensor_destroy(brain->w1);
-  tensor_destroy(brain->b1);
-  tensor_destroy(brain->w2);
-  tensor_destroy(brain->b2);
+  Tensor* ts[BRAIN_NUM_TENSORS];
+  brain_tensors(brain, ts);
+  for (int i = 0; i < BRAIN_NUM_TENSORS; i++) {
+    tensor_destroy(ts[i]);
+  }
   brain->w1 = NULL;
   brain->b1 = NULL;
   brain->w2 = NULL;
@@ -253,25 +209,11 @@ void brain_destroy(Brain* brain) {
 }
 
 void brain_randomize(Brain* brain) {
-  tensor_destroy(brain->w1);
-  tensor_destroy(brain->b1);
-  tensor_destroy(brain->w2);
-  tensor_destroy(brain->b2);
-
-  size_t d_w1[] = {(size_t)BRAIN_INPUTS, (size_t)BRAIN_HIDDEN};
-  size_t d_b1[] = {(size_t)BRAIN_HIDDEN};
-  size_t d_w2[] = {(size_t)BRAIN_HIDDEN, (size_t)BRAIN_OUTPUTS};
-  size_t d_b2[] = {(size_t)BRAIN_OUTPUTS};
-
-  brain->w1 = tensor_rand(2, d_w1);
-  brain->b1 = tensor_rand(1, d_b1);
-  brain->w2 = tensor_rand(2, d_w2);
-  brain->b2 = tensor_rand(1, d_b2);
-
-  shift_rand_tensor_to_minus_one_one(brain->w1);
-  shift_rand_tensor_to_minus_one_one(brain->b1);
-  shift_rand_tensor_to_minus_one_one(brain->w2);
-  shift_rand_tensor_to_minus_one_one(brain->b2);
+  Tensor* ts[BRAIN_NUM_TENSORS];
+  brain_tensors(brain, ts);
+  for (int i = 0; i < BRAIN_NUM_TENSORS; i++) {
+    tensor_fill_uniform(ts[i], -1.0f, 1.0f);
+  }
 }
 
 Direction brain_choose_direction(const Brain* brain, const Game* game) {
@@ -300,45 +242,35 @@ Direction brain_choose_direction(const Brain* brain, const Game* game) {
 }
 
 void brain_copy(Brain* dest, const Brain* src) {
-  memcpy(dest->w1->data, src->w1->data, dest->w1->element_count * sizeof(float));
-  memcpy(dest->b1->data, src->b1->data, dest->b1->element_count * sizeof(float));
-  memcpy(dest->w2->data, src->w2->data, dest->w2->element_count * sizeof(float));
-  memcpy(dest->b2->data, src->b2->data, dest->b2->element_count * sizeof(float));
+  tensor_copy_into(dest->w1, src->w1);
+  tensor_copy_into(dest->b1, src->b1);
+  tensor_copy_into(dest->w2, src->w2);
+  tensor_copy_into(dest->b2, src->b2);
 }
 
 void brain_mutate(Brain* brain, float mutation_rate, float mutation_strength) {
-  for (size_t i = 0; i < brain->w1->element_count; i++) {
-    brain->w1->data[i] = mutate_value(brain->w1->data[i], mutation_rate, mutation_strength);
-  }
-
-  for (size_t i = 0; i < brain->b1->element_count; i++) {
-    brain->b1->data[i] = mutate_value(brain->b1->data[i], mutation_rate, mutation_strength);
-  }
-
-  for (size_t i = 0; i < brain->w2->element_count; i++) {
-    brain->w2->data[i] = mutate_value(brain->w2->data[i], mutation_rate, mutation_strength);
-  }
-
-  for (size_t i = 0; i < brain->b2->element_count; i++) {
-    brain->b2->data[i] = mutate_value(brain->b2->data[i], mutation_rate, mutation_strength);
+  Tensor* ts[BRAIN_NUM_TENSORS];
+  brain_tensors(brain, ts);
+  for (int ti = 0; ti < BRAIN_NUM_TENSORS; ti++) {
+    Tensor* t = ts[ti];
+    for (size_t i = 0; i < t->element_count; i++) {
+      t->data[i] = mutate_value(t->data[i], mutation_rate, mutation_strength);
+    }
   }
 }
 
 void brain_crossover(Brain* child, const Brain* parent_a, const Brain* parent_b) {
-  for (size_t i = 0; i < child->w1->element_count; i++) {
-    child->w1->data[i] = random_bool() ? parent_a->w1->data[i] : parent_b->w1->data[i];
-  }
+  Tensor* c[BRAIN_NUM_TENSORS];
+  Tensor* a[BRAIN_NUM_TENSORS];
+  Tensor* b[BRAIN_NUM_TENSORS];
+  brain_tensors(child, c);
+  brain_tensors(parent_a, a);
+  brain_tensors(parent_b, b);
 
-  for (size_t i = 0; i < child->b1->element_count; i++) {
-    child->b1->data[i] = random_bool() ? parent_a->b1->data[i] : parent_b->b1->data[i];
-  }
-
-  for (size_t i = 0; i < child->w2->element_count; i++) {
-    child->w2->data[i] = random_bool() ? parent_a->w2->data[i] : parent_b->w2->data[i];
-  }
-
-  for (size_t i = 0; i < child->b2->element_count; i++) {
-    child->b2->data[i] = random_bool() ? parent_a->b2->data[i] : parent_b->b2->data[i];
+  for (int ti = 0; ti < BRAIN_NUM_TENSORS; ti++) {
+    for (size_t i = 0; i < c[ti]->element_count; i++) {
+      c[ti]->data[i] = rng_bool() ? a[ti]->data[i] : b[ti]->data[i];
+    }
   }
 }
 
@@ -357,11 +289,13 @@ bool brain_save(const Brain* brain, const char* path) {
     return false;
   }
 
+  Tensor* ts[BRAIN_NUM_TENSORS];
+  brain_tensors(brain, ts);
+
   size_t n = 0;
-  n += fwrite(brain->w1->data, sizeof(float), brain->w1->element_count, file);
-  n += fwrite(brain->b1->data, sizeof(float), brain->b1->element_count, file);
-  n += fwrite(brain->w2->data, sizeof(float), brain->w2->element_count, file);
-  n += fwrite(brain->b2->data, sizeof(float), brain->b2->element_count, file);
+  for (int i = 0; i < BRAIN_NUM_TENSORS; i++) {
+    n += tensor_write_raw(ts[i], file);
+  }
 
   fclose(file);
 
@@ -388,11 +322,13 @@ bool brain_load(Brain* brain, const char* path) {
     return false;
   }
 
+  Tensor* ts[BRAIN_NUM_TENSORS];
+  brain_tensors(brain, ts);
+
   size_t n = 0;
-  n += fread(brain->w1->data, sizeof(float), brain->w1->element_count, file);
-  n += fread(brain->b1->data, sizeof(float), brain->b1->element_count, file);
-  n += fread(brain->w2->data, sizeof(float), brain->w2->element_count, file);
-  n += fread(brain->b2->data, sizeof(float), brain->b2->element_count, file);
+  for (int i = 0; i < BRAIN_NUM_TENSORS; i++) {
+    n += tensor_read_raw(ts[i], file);
+  }
 
   fclose(file);
 

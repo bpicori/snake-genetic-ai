@@ -2,6 +2,7 @@
 #define TENSOR_H
 
 #include <stddef.h>
+#include <stdio.h>
 
 typedef struct {
   size_t ndim;
@@ -26,6 +27,10 @@ Tensor* tensor_create(size_t ndim, const size_t* dims);
      t ≈ [0.39, 0.84, 0.21, 0.93]                                     */
 Tensor* tensor_rand(size_t ndim, const size_t* dims);
 
+/* Allocate a tensor with values uniform in [min, max) (half-open interval).
+     Tensor* t = tensor_rand_uniform(1, (size_t[]){4}, -1.0f, 1.0f);                   */
+Tensor* tensor_rand_uniform(size_t ndim, const size_t* dims, float min, float max);
+
 /* Allocate a tensor and copy `data` into it (row-major).
      float v[] = {1, 2, 3, 4};
      Tensor* t = tensor_from_array(2, (size_t[]){2, 2}, v);
@@ -39,6 +44,19 @@ Tensor* tensor_clone(const Tensor* t);
 /* Free a tensor and all its owned allocations.
      tensor_destroy(t);                                               */
 void tensor_destroy(Tensor* t);
+
+/* Copy floats from src to dst (same shape). Dst buffer is overwritten.
+     Brain scratch buffers use this instead of reallocating tensors.         */
+void tensor_copy_into(Tensor* dst, const Tensor* src);
+
+/* Fill an existing tensor with values uniform in [min, max) (half-open interval),
+   same distribution as tensor_rand_uniform on a new tensor. */
+void tensor_fill_uniform(Tensor* t, float min, float max);
+
+/* Read/write the contiguous float payload (flat buffer).
+     Returns the number of float elements transferred (not bytes).           */
+size_t tensor_write_raw(const Tensor* t, FILE* f);
+size_t tensor_read_raw(Tensor* t, FILE* f);
 
 /* ------------------------------------------------------------------ */
 /* Indexing / shape                                                    */
@@ -54,9 +72,6 @@ float tensor_get(const Tensor* t, const size_t* idx);
      tensor_set(t, (size_t[]){1, 0}, 9.0)
      -> t = [[1, 2], [9, 4]]                                          */
 void tensor_set(Tensor* t, const size_t* idx, float v);
-
-/* Reshape a tensor (not yet implemented). */
-Tensor* tensor_reshape(const Tensor* t, size_t ndim, const size_t* dims);
 
 /* ------------------------------------------------------------------ */
 /* Element-wise math (same-shape, no broadcasting)                     */
